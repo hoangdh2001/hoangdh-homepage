@@ -1,0 +1,95 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    env:
+      CI: true
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - uses: actions/checkout@v4 # v4
+
+      # Beginning of yarn setup
+      - name: use node.js 20.x
+        uses: actions/setup-node@v4 # v4
+        with:
+          node-version: 20.x
+          registry-url: https://registry.npmjs.org/ # Needed for auth
+      - name: enable corepack for yarn berry
+        run: corepack enable
+      - name: get yarn cache dir
+        id: yarn-cache-dir
+        run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
+      - name: cache global yarn cache
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.yarn-cache-dir.outputs.dir }}
+          key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-yarn-
+      - name: cache all node_modules
+        id: cache-modules
+        uses: actions/cache@v4 # v4
+        with:
+          path: '**/node_modules'
+          key: ${{ runner.os }}-node_modules-${{ hashFiles('yarn.lock', '**/package.json') }}
+      - name: install dependencies
+        run: yarn install --immutable
+      
+      - name: lint
+        run: yarn lint
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Docker Login
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Get Release Version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+
+      - name: Cache Docker layers
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/.buildx-cache
+          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-buildx-
+    
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: ./Dockerfile
+          push: true
+          platforms: linux/amd64 # for mr4x2 server
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.REGISTRY_PREFIX }}:${{ steps.get_version.outputs.VERSION }}
+          cache-from: type=local,src=${{ runner.temp }}/.buildx-cache
+          cache-to: type=local,dest=${{ runner.temp }}/.buildx-cache-new,mode=max
+      
+      - # Temp fix
+      # https://github.com/docker/build-push-action/issues/252
+      # https://github.com/moby/buildkit/issues/1896
+        name: Move cache
+        run: |
+          rm -rf ${{ runner.temp }}/.buildx-cache
+          mv ${{ runner.temp }}/.buildx-cache-new ${{ runner.temp }}/.buildx-cache
+
+      - name: Telegram Notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🚀 New release of ${{ github.repository }}: ${{ steps.get_version.outputs.VERSION }}

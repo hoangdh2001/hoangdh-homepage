@@ -1,0 +1,36 @@
+name: Deploy
+
+on:
+  release:
+    types:
+      - published
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: 
+      name: prod
+      url: https://hoangdh.id.vn
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Get Release Version
+        id: get_version
+        run: echo ::set-output name=VERSION::${GITHUB_REF#refs/tags/}
+
+      - name: Deploy
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
+            "${{ secrets.COOLIFY_BASE_URL }}/api/v1/deploy?uuid=${{ secrets.COOLIFY_UUID }}&force=false"
+
+      - name: Telegram Notification
+        uses: appleboy/telegram-action@master
+        with:
+          to: ${{ secrets.TELEGRAM_TO }}
+          token: ${{ secrets.TELEGRAM_TOKEN }}
+          message: |
+            🚀 Release ${{ steps.get_version.outputs.VERSION }} of ${{ github.repository }} has been deployed!
+            💻 Website: https://hoangdh.id.vn
