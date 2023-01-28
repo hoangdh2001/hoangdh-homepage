@@ -1,0 +1,61 @@
+{
+  "directories": [
+    {
+      "name": "/",
+      "path": "/",
+      "route": "/"
+    },
+    {
+      "name": "about",
+      "path": "/about",
+      "route": "/about"
+    },
+    {
+      "name": "blog",
+      "path": "/blog",
+      "route": "/blog"
+    },
+    {
+      "name": "documents",
+      "path": "/documents",
+      "route": "/documents"
+    },
+    {
+      "name": "notes",
+      "path": "/notes",
+      "route": "/notes"
+    },
+    {
+      "name": "projects",
+      "path": "/projects",
+      "route": "/projects"
+    }
+  ],
+  "files": [
+    {
+      "name": "apple-ui-test-automation-plugin.mdx",
+      "path": "/blog/apple-ui-test-automation-plugin.mdx",
+      "route": "/blog/apple-ui-test-automation-plugin"
+    },
+    {
+      "name": "focuslens-ios-distraction-blocker.mdx",
+      "path": "/blog/focuslens-ios-distraction-blocker.mdx",
+      "route": "/blog/focuslens-ios-distraction-blocker"
+    },
+    {
+      "name": "linked-list.mdx",
+      "path": "/blog/linked-list.mdx",
+      "route": "/blog/linked-list"
+    },
+    {
+      "name": "mvvm-vs-tca-swiftui.mdx",
+      "path": "/blog/mvvm-vs-tca-swiftui.mdx",
+      "route": "/blog/mvvm-vs-tca-swiftui"
+    },
+    {
+      "name": "stack-and-queue.mdx",
+      "path": "/blog/stack-and-queue.mdx",
+      "route": "/blog/stack-and-queue"
+    }
+  ]
+}
