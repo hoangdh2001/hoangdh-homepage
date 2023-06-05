@@ -1,0 +1,77 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#1a1a2e"/>
+      <stop offset="50%" style="stop-color:#16213e"/>
+      <stop offset="100%" style="stop-color:#0f3460"/>
+    </linearGradient>
+    <linearGradient id="lens" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#e2e8f0;stop-opacity:0.9"/>
+      <stop offset="100%" style="stop-color:#94a3b8;stop-opacity:0.7"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#6366f1"/>
+      <stop offset="100%" style="stop-color:#06b6d4"/>
+    </linearGradient>
+    <radialGradient id="center-glow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" style="stop-color:#818cf8;stop-opacity:1"/>
+      <stop offset="60%" style="stop-color:#6366f1;stop-opacity:0.8"/>
+      <stop offset="100%" style="stop-color:#4f46e5;stop-opacity:0"/>
+    </radialGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="4" stdDeviation="8" flood-color="#6366f1" flood-opacity="0.3"/>
+    </filter>
+    <filter id="inner-glow" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="url(#bg)"/>
+
+  <!-- Subtle radial rays -->
+  <g opacity="0.08">
+    <line x1="256" y1="256" x2="256" y2="60" stroke="white" stroke-width="2"/>
+    <line x1="256" y1="256" x2="452" y2="256" stroke="white" stroke-width="2"/>
+    <line x1="256" y1="256" x2="256" y2="452" stroke="white" stroke-width="2"/>
+    <line x1="256" y1="256" x2="60" y2="256" stroke="white" stroke-width="2"/>
+    <line x1="256" y1="256" x2="394.5" y2="117.5" stroke="white" stroke-width="1.5"/>
+    <line x1="256" y1="256" x2="394.5" y2="394.5" stroke="white" stroke-width="1.5"/>
+    <line x1="256" y1="256" x2="117.5" y2="394.5" stroke="white" stroke-width="1.5"/>
+    <line x1="256" y1="256" x2="117.5" y2="117.5" stroke="white" stroke-width="1.5"/>
+  </g>
+
+  <!-- Outer ring -->
+  <circle cx="256" cy="256" r="155" fill="none" stroke="url(#lens)" stroke-width="3" opacity="0.3"/>
+
+  <!-- Aperture blades (6 blades) -->
+  <g filter="url(#shadow)" opacity="0.85">
+    <!-- Blade 1 (top) -->
+    <path d="M256 116 L312 172 L256 196 Z" fill="url(#lens)" opacity="0.6"/>
+    <!-- Blade 2 (top-right) -->
+    <path d="M377 152 L370 228 L312 210 Z" fill="url(#lens)" opacity="0.55"/>
+    <!-- Blade 3 (bottom-right) -->
+    <path d="M396 290 L330 330 L320 262 Z" fill="url(#lens)" opacity="0.5"/>
+    <!-- Blade 4 (bottom) -->
+    <path d="M256 396 L200 340 L256 316 Z" fill="url(#lens)" opacity="0.6"/>
+    <!-- Blade 5 (bottom-left) -->
+    <path d="M135 360 L142 284 L200 302 Z" fill="url(#lens)" opacity="0.55"/>
+    <!-- Blade 6 (top-left) -->
+    <path d="M116 222 L182 182 L192 250 Z" fill="url(#lens)" opacity="0.5"/>
+  </g>
+
+  <!-- Middle ring -->
+  <circle cx="256" cy="256" r="90" fill="none" stroke="url(#glow)" stroke-width="2.5" opacity="0.5"/>
+
+  <!-- Inner ring -->
+  <circle cx="256" cy="256" r="55" fill="none" stroke="url(#glow)" stroke-width="2" opacity="0.35"/>
+
+  <!-- Center focus dot with glow -->
+  <circle cx="256" cy="256" r="30" fill="url(#center-glow)" filter="url(#inner-glow)"/>
+  <circle cx="256" cy="256" r="12" fill="#c7d2fe" opacity="0.9"/>
+  <circle cx="256" cy="256" r="5" fill="white" opacity="0.95"/>
+</svg>
