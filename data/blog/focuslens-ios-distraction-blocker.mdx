@@ -1,0 +1,427 @@
+---
+title: 'FocusLens - AI-Powered Distraction Blocker for iOS'
+date: '2026-04-04'
+lastmod: '2026-04-04'
+tags: ['ios', 'swiftui', 'tca', 'coreml']
+summary: 'Building an iOS distraction blocker with SwiftUI, TCA 1.x, SwiftData, Core ML, Screen Time API, WidgetKit, and ActivityKit.'
+images: ['/static/images/robot.png']
+authors: ['hoangdh2001']
+---
+
+## 1. Introduction
+
+**FocusLens** is an iOS application that helps users stay focused by intelligently blocking distracting apps using on-device machine learning and Apple's Screen Time API.
+
+The app is built as a portfolio showcase demonstrating modern iOS development practices: **SwiftUI**, **The Composable Architecture (TCA) 1.x**, **SwiftData**, **Core ML**, **WidgetKit**, and **ActivityKit**.
+
+Source code: [hoangdh2001/FocusLens](https://github.com/hoangdh2001/FocusLens)
+
+### Key Features
+- **Focus Sessions** -- Deep focus, pomodoro, and light sessions with countdown timer
+- **AI Classification** -- On-device Core ML model classifies apps as focus, neutral, or distraction
+- **Screen Time Integration** -- Blocks distracting apps during focus sessions via `ManagedSettings`
+- **Live Activity** -- Real-time countdown on Dynamic Island and Lock Screen
+- **Insights Dashboard** -- Swift Charts visualizations of daily/weekly focus trends
+- **Home Screen Widget** -- Track streak and focus time at a glance
+- **Block Rules** -- Custom rules to block specific app categories by time of day
+
+---
+
+## 2. Architecture
+
+FocusLens follows a strict **unidirectional data flow** architecture using The Composable Architecture (TCA).
+
+```
+                        AppReducer
+  +-----------+ +----------+ +--------+ +--------+
+  | Dashboard | |  Focus   | |Insights| |Settings|
+  | Feature   | | Session  | |Feature | |Feature |
+  +-----+-----+ +----+-----+ +---+----+ +---+----+
+        |             |           |          |
+  +-----+-------------+-----------+----------+----+
+  |              @Dependency Layer                 |
+  |  SessionRepository  ScreenTimeClient           |
+  |  ClassifierClient   LiveActivityClient         |
+  |  HapticClient       WidgetDataClient           |
+  +------------------------------------------------+
+```
+
+### Design Principles
+1. **Views are stateless** -- bind to `Store` only, no local `@State` for business logic
+2. **All side effects through `@Dependency`** -- fully testable, swappable in tests
+3. **No framework imports in Reducers** -- pure business logic, no UIKit/SwiftUI
+4. **Value-type DTOs** -- separate `@Model` from reducer State to avoid reference semantics
+5. **`@ModelActor`** -- thread-safe SwiftData access from TCA effects
+
+---
+
+## 3. Tech Stack
+
+| Technology | Usage |
+|:---|:---|
+| SwiftUI | All UI |
+| TCA 1.x | State management, navigation, dependency injection |
+| SwiftData | Local persistence (`@Model`, `@ModelActor`) |
+| Core ML + Create ML | On-device app classification |
+| Screen Time API | FamilyControls, ManagedSettings, DeviceActivity |
+| ActivityKit | Live Activity, Dynamic Island |
+| WidgetKit | Home screen widgets |
+| Swift Charts | Usage insights visualization |
+| GitHub Actions | CI pipeline |
+
+---
+
+## 4. State Management with TCA
+
+TCA enforces unidirectional data flow: **View sends Action -> Reducer updates State -> View re-renders**.
+
+### 4.1. Feature Reducer Pattern
+
+Each feature follows the same pattern: a `State` struct, an `Action` enum, and a `reduce(into:action:)` method.
+
+```swift:FocusSessionFeature.swift caption="FocusSessionFeature.swift" showLineNumbers
+struct FocusSessionFeature: Reducer {
+    struct State: Equatable {
+        var sessionType: SessionType = .deep
+        var durationSeconds: Int = 3600
+        var remainingSeconds: Int = 3600
+        var isRunning: Bool = false
+        var blockedAttempts: Int = 0
+        var errorMessage: String?
+    }
+
+    enum Action: Sendable, Equatable {
+        case startTapped
+        case stopTapped
+        case timerTicked
+        case sessionTypeChanged(SessionType)
+        case sessionSaved
+        case sessionSaveFailed(String)
+        // ...
+    }
+
+    @Dependency(\.continuousClock) var clock
+    @Dependency(\.screenTimeClient) var screenTimeClient
+    @Dependency(\.sessionRepository) var sessionRepository
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+        case .startTapped:
+            state.isRunning = true
+            return .run { send in
+                try await screenTimeClient.activateShield()
+                for await _ in clock.timer(interval: .seconds(1)) {
+                    await send(.timerTicked)
+                }
+            }
+        case .timerTicked:
+            state.remainingSeconds -= 1
+            if state.remainingSeconds <= 0 {
+                state.isRunning = false
+                return .send(.stopTapped)
+            }
+            return .none
+        // ...
+        }
+    }
+}
+```
+
+### 4.2. Dependency Injection
+
+TCA's `@Dependency` system allows injecting real implementations in the app and mock implementations in tests.
+
+```swift:SessionRepository.swift caption="SessionRepository.swift" showLineNumbers
+struct SessionRepository: Sendable {
+    var saveFocusSession: @Sendable (FocusSessionDTO) async throws -> Void
+    var fetchSessions: @Sendable (DateInterval) async throws -> [FocusSessionDTO]
+    var deleteSession: @Sendable (UUID) async throws -> Void
+    // ...
+}
+
+extension SessionRepository: DependencyKey {
+    static let liveValue: SessionRepository = .live(modelContainer: ...)
+    static let testValue = SessionRepository(
+        saveFocusSession: unimplemented("SessionRepository.saveFocusSession"),
+        fetchSessions: unimplemented("SessionRepository.fetchSessions"),
+        deleteSession: unimplemented("SessionRepository.deleteSession")
+    )
+}
+```
+
+### 4.3. AppReducer -- Composing Child Reducers
+
+The root reducer manually forwards actions to child reducers and handles cross-feature navigation.
+
+```swift:AppReducer.swift caption="AppReducer.swift" showLineNumbers
+struct AppReducer: Reducer {
+    struct State: Equatable {
+        var selectedTab: Tab = .dashboard
+        var dashboard = DashboardFeature.State()
+        var focusSession = FocusSessionFeature.State()
+        var insights = InsightsFeature.State()
+        var settings = SettingsFeature.State()
+    }
+
+    enum Action: Sendable {
+        case tabSelected(Tab)
+        case dashboard(DashboardFeature.Action)
+        case focusSession(FocusSessionFeature.Action)
+        case insights(InsightsFeature.Action)
+        case settings(SettingsFeature.Action)
+    }
+
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        // Forward to child reducers + parent cross-cutting logic
+        // e.g. dashboard(.startFocusSessionTapped) -> switch to focusSession tab
+    }
+}
+```
+
+---
+
+## 5. Persistence with SwiftData
+
+### 5.1. `@Model` Classes
+
+SwiftData models use reference semantics, which conflicts with TCA's value-type `State`. The solution: **value-type DTOs**.
+
+```swift:FocusSessionModel.swift caption="FocusSessionModel.swift" showLineNumbers
+@Model
+final class FocusSessionModel {
+    @Attribute(.unique) var id: UUID
+    var startedAt: Date
+    var endedAt: Date?
+    var plannedDurationSeconds: Int
+    var actualDurationSeconds: Int
+    var sessionType: String
+    var blockedAttempts: Int
+    var isCompleted: Bool
+}
+```
+
+```swift:FocusSessionDTO.swift caption="FocusSessionDTO.swift" showLineNumbers
+struct FocusSessionDTO: Equatable, Identifiable, Sendable {
+    var id: UUID
+    var startedAt: Date
+    var endedAt: Date?
+    var plannedDurationSeconds: Int
+    var actualDurationSeconds: Int
+    var sessionType: SessionType
+    var blockedAttempts: Int
+    var isCompleted: Bool
+}
+```
+
+### 5.2. Thread-Safe Access with `@ModelActor`
+
+SwiftData's `ModelContext` is not `Sendable`. Using `@ModelActor` creates an actor-isolated context for safe background access from TCA effects.
+
+```swift:SessionRepository.swift caption="PersistenceActor" showLineNumbers
+@ModelActor
+actor PersistenceActor {
+    func saveFocusSession(_ dto: FocusSessionDTO) throws {
+        let model = FocusSessionModel(/* map from DTO */)
+        modelContext.insert(model)
+        try modelContext.save()
+    }
+
+    func fetchSessions(_ interval: DateInterval) throws -> [FocusSessionDTO] {
+        let descriptor = FetchDescriptor<FocusSessionModel>(
+            predicate: #Predicate { $0.startedAt >= interval.start && $0.startedAt <= interval.end },
+            sortBy: [SortDescriptor(\.startedAt, order: .reverse)]
+        )
+        return try modelContext.fetch(descriptor).map { /* map to DTO */ }
+    }
+}
+```
+
+---
+
+## 6. Core ML Classification
+
+FocusLens uses an on-device Core ML model to classify apps into three categories: **focus**, **neutral**, and **distraction**.
+
+```swift:ClassifierClient.swift caption="ClassifierClient.swift" showLineNumbers
+struct ClassifierClient: Sendable {
+    var classify: @Sendable (AppUsageRecordDTO) async -> AppClassification
+}
+
+enum AppClassification: String, Sendable {
+    case focus       // Productivity, education apps
+    case neutral     // Utilities, system apps
+    case distraction // Social media, games, entertainment
+}
+```
+
+The classifier uses features like `bundleId`, `category`, and `hourOfDay` to make predictions. Training data is bundled as CSV and processed with Create ML.
+
+---
+
+## 7. Screen Time API Integration
+
+Apple's Screen Time API consists of three frameworks:
+
+| Framework | Purpose |
+|:---|:---|
+| `FamilyControls` | Request authorization |
+| `ManagedSettings` | Block/shield apps |
+| `DeviceActivity` | Monitor app usage schedules |
+
+```swift:ScreenTimeClient.swift caption="ScreenTimeClient.swift" showLineNumbers
+struct ScreenTimeClient: Sendable {
+    var requestAuthorization: @Sendable () async throws -> Void
+    var activateShield: @Sendable () async throws -> Void
+    var deactivateShield: @Sendable () async throws -> Void
+    var scheduleMonitoring: @Sendable (DateInterval) async throws -> Void
+}
+```
+
+> [!NOTE]
+> Screen Time API requires a physical device and can only be tested with a real Apple ID enrolled in Family Sharing. On the simulator, the client returns mock values.
+
+---
+
+## 8. Live Activity & Dynamic Island
+
+FocusLens shows a real-time countdown on the Lock Screen and Dynamic Island during active focus sessions using ActivityKit.
+
+```swift:FocusSessionAttributes.swift caption="FocusSessionAttributes.swift" showLineNumbers
+struct FocusSessionAttributes: ActivityAttributes {
+    struct ContentState: Codable, Hashable {
+        var remainingSeconds: Int
+        var blockedAttempts: Int
+    }
+    var sessionType: String
+    var totalSeconds: Int
+}
+```
+
+The `LiveActivityClient` dependency manages the lifecycle:
+
+```swift:LiveActivityClient.swift caption="LiveActivityClient.swift" showLineNumbers
+struct LiveActivityClient: Sendable {
+    var start: @Sendable (FocusSessionAttributes, FocusSessionAttributes.ContentState) async throws -> Void
+    var update: @Sendable (FocusSessionAttributes.ContentState) async -> Void
+    var stop: @Sendable () async -> Void
+}
+```
+
+---
+
+## 9. Testing with TCA TestStore
+
+TCA provides `TestStore` for deterministic, step-by-step reducer testing. Every action, state mutation, and effect is verified.
+
+```swift:FocusSessionFeatureTests.swift caption="FocusSessionFeatureTests.swift" showLineNumbers
+@Test
+func startSession_happyPath() async {
+    let clock = TestClock()
+
+    let store = TestStore(
+        initialState: FocusSessionFeature.State(durationSeconds: 3, remainingSeconds: 3)
+    ) {
+        FocusSessionFeature()
+    } withDependencies: {
+        $0.continuousClock = clock
+        $0.screenTimeClient.activateShield = {}
+        $0.sessionRepository.saveFocusSession = { _ in }
+        $0.hapticClient.notification = { _ in }
+        $0.widgetDataClient.update = { _, _, _ in }
+    }
+
+    await store.send(.startTapped) {
+        $0.isRunning = true
+    }
+
+    await clock.advance(by: .seconds(1))
+    await store.receive(.timerTicked) {
+        $0.remainingSeconds = 2
+    }
+
+    // ... advance clock until session completes
+}
+```
+
+### Test Coverage
+| Suite | Tests | What's Covered |
+|:---|:---:|:---|
+| FocusSessionFeatureTests | 4 | Timer, shield activation, save flow, error handling |
+| DashboardFeatureTests | 2 | Data loading, stats computation |
+| InsightsFeatureTests | 2 | Range switching, metrics calculation |
+| BlockRulesFeatureTests | 3 | CRUD operations, toggle, delete |
+| SettingsFeatureTests | 3 | Screen Time auth, state mutations |
+| ClassifierClientTests | 3 | Classification accuracy |
+| ClassifyAppsUseCaseTests | 1 | End-to-end classify + persist |
+| FocusLensTests | 1 | Smoke test |
+| **Total** | **20** | |
+
+---
+
+## 10. Project Structure
+
+```
+FocusLens/
+  App/
+    AppReducer.swift          -- Root reducer, tab navigation, deep links
+    FocusLensApp.swift        -- @main entry, ModelContainer setup
+  Features/
+    Dashboard/                -- Today's stats, recent sessions, quick actions
+    FocusSession/             -- Timer, progress ring, shield control
+    Insights/                 -- Swift Charts, date range filtering
+    BlockRules/               -- CRUD for app blocking rules
+    Settings/                 -- Screen Time auth, preferences
+  Domain/
+    Models/                   -- @Model classes, DTOs, enums
+    UseCases/                 -- ClassifyAppsUseCase
+  Data/
+    Persistence/              -- SessionRepository, PersistenceActor
+    ScreenTime/               -- ScreenTimeClient
+    MLClassifier/             -- ClassifierClient
+    LiveActivity/             -- LiveActivityClient
+  Shared/
+    HapticClient.swift        -- UIKit haptic feedback
+    WidgetDataClient.swift    -- UserDefaults + WidgetCenter bridge
+    Extensions/               -- Date helpers
+FocusLensWidget/              -- WidgetKit extension
+FocusLensTests/               -- 20 TCA TestStore tests
+```
+
+---
+
+## 11. Lessons Learned
+
+### Swift 6.2 + TCA Compatibility
+
+Building with Swift 6.2 and `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` introduced several challenges:
+
+1. **`@Reducer` macro broken** -- Causes circular reference errors. Workaround: use `struct Feature: Reducer` with `func reduce(into:action:)` instead of `var body: some ReducerOf<Self>`.
+
+2. **`nonisolated` required on value type inits** -- DTO initializers need `nonisolated` annotation when default actor isolation is MainActor.
+
+3. **`CancelID` needs `nonisolated(unsafe)`** -- Static enum used for effect cancellation must be marked `nonisolated(unsafe)` to satisfy `Sendable`.
+
+4. **Explicit SPM transitive dependencies** -- Xcode 26 debug builds don't link transitive SPM dependencies automatically. Must add `swift-dependencies`, `swift-clocks`, etc. explicitly to the test target.
+
+### Value-Type DTOs are Essential
+
+Mixing SwiftData `@Model` (reference type) directly in TCA `State` (value type, `Equatable`) causes subtle bugs. The DTO layer adds boilerplate but eliminates an entire class of issues.
+
+### `@ModelActor` for Thread Safety
+
+SwiftData's `ModelContext` is not thread-safe. Wrapping persistence in a `@ModelActor` actor ensures all database access is serialized, which integrates cleanly with TCA's `Effect.run` async effects.
+
+---
+
+## 12. What's Next
+
+- [ ] Onboarding flow with Screen Time permission request
+- [ ] iCloud sync via `CloudKit` integration in SwiftData
+- [ ] App Intents for Siri Shortcuts ("Start a focus session")
+- [ ] Richer Core ML model trained on real usage data
+- [ ] App Store submission
+
+---
+
+> [!NOTE]
+> Full source code is available at [hoangdh2001/FocusLens](https://github.com/hoangdh2001/FocusLens). Feel free to explore, fork, and contribute!
