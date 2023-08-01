@@ -1,0 +1,317 @@
+---
+title: 'apple-ui-test-automation - AI-Powered UI Testing Plugin for Apple Platforms'
+date: '2026-04-20'
+lastmod: '2026-04-20'
+tags: ['ios', 'macos', 'xcode', 'ui-testing', 'claude-code', 'automation']
+summary: 'Building a Claude Code plugin that automates UI testing for iOS, iPadOS, and macOS apps using xcodebuildmcp and AXe CLI — no XCTest code required.'
+images: ['/static/images/robot.png']
+authors: ['hoangdh2001']
+---
+
+## 1. Introduction
+
+**apple-ui-test-automation** is a Claude Code plugin that lets you run AI-driven UI tests on your Apple apps without writing a single line of XCTest code.
+
+Instead of maintaining a separate test suite in Xcode, you describe what to test — or define test cases in a YAML file — and the plugin handles the rest: it builds your app, selects the right simulator, executes interactions via the AXe CLI, captures screenshots, and generates a Markdown report.
+
+Source code: [hoangdh2001/apple-app-ui-test-automation](https://github.com/hoangdh2001/apple-app-ui-test-automation)
+
+### Key Features
+- **Multi-platform** -- iPhone, iPad (split-view, popovers, multitasking), and macOS (native + Mac Catalyst)
+- **Two test modes** -- Ad-hoc (describe what to test in plain language) and regression (YAML test suite)
+- **Smart device selection** -- Recommends simulator based on test type (layout-sensitive, theme, regression)
+- **Auto retry** -- Detects flaky tests with retry logic and root cause analysis
+- **Markdown reports** -- Summary table, per-test screenshots, timing, and environment metadata
+
+---
+
+## 2. Architecture
+
+The plugin follows a **skill-based architecture** — the same pattern used by Claude Code's own tooling. Agents orchestrate workflows by calling stateless skills in sequence.
+
+```
+              ios-ui-automation-tester
+  +----------+ +----------+ +----------+
+  |  iphone  | |   ipad   | |  macos   |
+  |  tester  | |  tester  | |  tester  |
+  +----+-----+ +----+-----+ +----+-----+
+       |             |            |
+  +----+-------------+------------+------+
+  |              Skills Layer            |
+  |  verify-cli-env    load-test-cases   |
+  |  select-simulator  run-test-case     |
+  |  generate-test-report                |
+  +--------------------------------------+
+            |               |
+    xcodebuildmcp          axe
+    (build & launch)  (UI interactions)
+```
+
+### Design Principles
+1. **Agents hold state** -- UDID, bundle ID, and test results live in the agent across phases
+2. **Skills are stateless** -- each skill has a clear input/output contract documented at the top of its file
+3. **User-confirmable decisions** -- device selection always waits for human approval before proceeding
+4. **Platform-specific adaptations** -- iPad and macOS agents handle their own quirks (no tab bar on macOS, split-view on iPad)
+
+---
+
+## 3. Tech Stack
+
+| Technology | Usage |
+|:---|:---|
+| Claude Code | Agent + skill orchestration |
+| xcodebuildmcp | Build Xcode projects, launch simulators |
+| AXe CLI | UI interactions (tap, swipe, type, assert, screenshot) |
+| YAML | Regression test case definitions |
+| Markdown | Generated test reports |
+
+---
+
+## 4. The 7-Phase Workflow
+
+Every agent — iPhone, iPad, macOS, or universal — runs the same 7-phase pipeline.
+
+```
+Phase 1: verify-cli-env
+  └─ Check xcodebuildmcp and axe are installed
+
+Phase 2: Project discovery
+  └─ Find .xcodeproj and available schemes
+
+Phase 3: load-test-cases
+  └─ Ad-hoc: generate plan from user description
+     Regression: parse tests/ios-tests.yaml
+
+Phase 4: select-{iphone,ipad,mac}-simulator
+  └─ List available simulators, recommend, wait for user
+
+Phase 5: Build & launch
+  └─ xcodebuildmcp build + launch on selected target
+
+Phase 6: run-test-case (per case)
+  └─ Reset → execute steps → assert → retry on failure
+
+Phase 7: generate-test-report
+  └─ Write Markdown report to tests/reports/
+```
+
+---
+
+## 5. Test Case YAML Schema
+
+Regression tests live in `tests/ios-tests.yaml`. The schema maps high-level intent to AXe CLI commands.
+
+```yaml:tests/ios-tests.yaml caption="tests/ios-tests.yaml" showLineNumbers
+suite: Sample iOS Test Suite
+version: 1.0
+cases:
+  - id: navigate-to-settings
+    name: "Navigate to Settings tab"
+    feature: "Settings"
+    steps:
+      - navigate: Settings        # taps tab bar item by label
+      - tap: "Notifications"      # taps any element by accessibility label
+      - select: "Daily Digest"    # selects from picker or menu
+    expect:
+      - ui_contains: "Notifications"
+      - element_not_exists: "Error"
+
+  - id: create-focus-session
+    name: "Start a deep focus session"
+    feature: "Focus > Session"
+    steps:
+      - navigate: Focus
+      - tap: "Deep Focus"
+      - tap: "Start"
+    expect:
+      - ui_contains: "60:00"
+      - element_not_exists: "Start"
+```
+
+Each step verb maps directly to an `axe` command:
+
+| YAML verb | AXe command |
+|:---|:---|
+| `navigate` | `axe tap --label "<tab>"` |
+| `tap` | `axe tap --label "<element>"` |
+| `select` | `axe tap --label "<option>"` |
+| `type` | `axe type --text "<text>"` |
+
+---
+
+## 6. Skills in Detail
+
+### 6.1. `verify-cli-env`
+
+Pre-flight check. Runs `xcodebuildmcp --version` and `axe --version`. If either is missing, stops with install instructions rather than failing mid-run.
+
+### 6.2. `load-test-cases`
+
+Two modes:
+
+- **Ad-hoc** -- User describes what to test in plain language. The skill infers a minimal test plan (3–5 cases) without reading any YAML.
+- **Regression** -- Reads `tests/ios-tests.yaml`. If the file doesn't exist, infers cases from the codebase (tab names, feature flags, SwiftUI view names).
+
+### 6.3. `select-iphone-simulator` / `select-ipad-simulator`
+
+Calls `axe list-simulators`, filters to the relevant device family, and recommends based on test content:
+
+| Test type | iPhone recommendation | iPad recommendation |
+|:---|:---|:---|
+| Theme / appearance | Any mid-size (iPhone 15) | iPad Pro (largest canvas) |
+| Layout-sensitive | SE + Pro Max (both widths) | iPad mini (compact) |
+| Split-view / multitasking | N/A | iPad Pro 11" or 12.9" |
+| General regression | Latest available | iPad Pro |
+
+Always waits for user confirmation before proceeding.
+
+### 6.4. `run-test-case`
+
+The core execution loop for a single test case:
+
+```
+Step 1: Reset app to known state (Dashboard tab)
+Step 2: Execute steps via axe batch
+Step 3: Assert expected UI state
+Step 4: On failure → retry once, capture screenshot, log root cause
+```
+
+Returns `pass`, `flaky`, or `fail` with a screenshot path and failure note.
+
+### 6.5. `generate-test-report`
+
+Collects git commit SHA, CLI versions, and per-test results, then writes:
+
+```
+tests/reports/2026-04-20-14-30-iphone-regression.md
+tests/reports/screenshots/<test-id>-pass.png
+tests/reports/screenshots/<test-id>-fail.png
+```
+
+Report format: summary table (pass/fail/flaky counts) → per-test sections with screenshots → environment metadata.
+
+---
+
+## 7. Platform-Specific Adaptations
+
+### macOS
+
+macOS apps have no tab bar. The `macos-tester` agent replaces `navigate` steps with menu bar actions (`File > ...`, `View > ...`) and manages window focus via `axe focus`. Accessibility permission must be granted to the terminal before the agent can interact with the app.
+
+### iPad
+
+The `ipad-tester` agent adds checks for:
+
+- **Split-view** -- Tests in both compact and regular size classes
+- **Popovers** -- Dismissal differs from modal sheets
+- **Keyboard shortcuts** -- Hardware keyboard behavior varies by device
+- **Slide-over** -- Secondary app overlay interactions
+
+---
+
+## 8. Plugin Structure
+
+```
+apple-app-ui-test-automation/
+  .claude-plugin/
+    plugin.json          -- Manifest: name, version, agents, commands
+    marketplace.json     -- Marketplace entry for Claude Code registry
+  agents/
+    ios-ui-automation-tester.md   -- Universal orchestrator
+    iphone-tester.md              -- iPhone-specific
+    ipad-tester.md                -- iPad-specific (split-view, popovers)
+    macos-tester.md               -- macOS / Mac Catalyst
+  skills/
+    verify-cli-env/SKILL.md
+    load-test-cases/SKILL.md
+    select-iphone-simulator/SKILL.md
+    select-ipad-simulator/SKILL.md
+    select-mac-target/SKILL.md
+    run-test-case/SKILL.md
+    generate-test-report/SKILL.md
+  tests/
+    ios-tests.yaml       -- Regression test definitions
+    reports/             -- Generated reports (gitignored)
+```
+
+---
+
+## 9. Installation
+
+### Prerequisites
+
+| Tool | Install |
+|:---|:---|
+| `xcodebuildmcp` | `npm install -g xcodebuildmcp@latest` |
+| `axe` | [github.com/cameroncooke/AXe](https://github.com/cameroncooke/AXe) |
+
+**macOS only:** System Settings → Privacy & Security → Accessibility → grant your terminal.
+
+### Install the plugin
+
+```bash
+# Add the marketplace
+claude plugin marketplace add hoangdh2001/apple-app-ui-test-automation
+
+# Install the plugin
+claude plugin install apple-ui-test-automation
+```
+
+Then restart Claude Code. The agents and skills are available in any Claude Code session inside an Xcode project directory.
+
+---
+
+## 10. Quick Start
+
+Open a Claude Code session in your Xcode project root and invoke an agent:
+
+```
+# Run regression suite on iPhone
+Use the iphone-tester agent to run the regression suite
+
+# Test iPad split-view behavior
+Use the ipad-tester agent to test split-view on my app
+
+# Ad-hoc test on macOS
+Use the macos-tester agent to test that the settings panel opens correctly
+
+# Auto-detect iPhone or iPad
+Use the ios-ui-automation-tester agent
+```
+
+The agent guides you through device selection, builds the app, runs the tests, and drops a Markdown report in `tests/reports/`.
+
+---
+
+## 11. Lessons Learned
+
+### Skill-based plugins scale well
+
+Breaking the workflow into 7 independent skills made iteration fast. When the iPad split-view logic needed rework, only `select-ipad-simulator` and `run-test-case` were touched — the other 5 skills were unchanged.
+
+### State belongs in the agent, not the skills
+
+Early versions tried to pass state through skill return values, which made the YAML schema complicated. Moving state ownership to the agent (UDID, bundle ID, accumulated results) simplified every skill's interface.
+
+### Device selection needs human confirmation
+
+Automated device selection based on test type works ~80% of the time. The remaining 20% — especially for layout-sensitive tests — needs a human to confirm which device sizes actually matter for the feature under test. The confirm-before-proceed pattern prevents wasted test runs.
+
+### Retry logic catches flakiness early
+
+Animation timing and simulator state cause intermittent failures. A single automatic retry with screenshot capture makes the difference between a `fail` and a `flaky` classification, which gives developers the right signal to investigate rather than re-run.
+
+---
+
+## 12. What's Next
+
+- [ ] `select-tvos-simulator` skill for Apple TV
+- [ ] `select-watchos-simulator` skill for watchOS
+- [ ] Parallel multi-device runs (iPhone SE + Pro Max simultaneously)
+- [ ] CI integration — GitHub Actions workflow that runs the regression suite on every PR
+- [ ] Test case generation from SwiftUI `accessibilityIdentifier` annotations
+
+---
+
+> [!NOTE]
+> Full source code and plugin manifest at [hoangdh2001/apple-app-ui-test-automation](https://github.com/hoangdh2001/apple-app-ui-test-automation). Install with `claude plugin install apple-ui-test-automation` and start testing without writing XCTest.
