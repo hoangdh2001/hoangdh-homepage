@@ -1,0 +1,28 @@
+name: Feature Enhancement
+description: Provide supporting details for a feature in development
+title: "[feature] "
+labels: 
+  - enhancement
+
+body:
+  - type: textarea
+    id: feature
+    attributes:
+      label: What would you like to be added?
+    validations:
+      required: true
+
+  - type: textarea
+    id: rationale
+    attributes:
+      label: Why is this needed?
+    validations:
+      required: true
+  
+  - type: textarea
+    id: test-plan
+    attributes:
+      label: Expected Test Plan
+      description: "Which automated tests or coverage changes should accompany this work?"
+    validations:
+      required: false
