@@ -1,0 +1,568 @@
+---
+title: 'MVVM vs TCA — The SwiftUI Architecture Showdown'
+date: '2025-01-08'
+lastmod: '2025-09-25'
+tags: ['ios', 'swiftui', 'tca', 'mvvm', 'architecture']
+summary: 'A practical, opinionated comparison of MVVM and The Composable Architecture for SwiftUI — with diagrams, side-by-side code, and a verdict on when to choose each.'
+images: ['/static/images/robot.png']
+authors: ['hoangdh2001']
+---
+
+## 1. Introduction
+
+You've opened Xcode, created a new SwiftUI file, and now you're paralyzed by the most philosophical question in iOS development: *where does my business logic go?*
+
+Put it in the `View`? Veteran devs will haunt your dreams. Create a `ViewModel`? Classic, solid, totally defensible. Adopt **The Composable Architecture**? You'll either love it or spend three days reading the docs before writing a single line of UI.
+
+This post is a practical, code-first comparison of **MVVM** and **TCA** — two of the most widely adopted architectures for SwiftUI apps. By the end, you'll know which one to reach for, and why.
+
+### What We'll Cover
+- **Core concepts** of each architecture
+- **Side-by-side code** for the same feature
+- **Pros, cons, and painful truths**
+- **A decision framework** for real-world projects
+
+---
+
+## 2. MVVM — The Comfortable Classic
+
+MVVM (Model–View–ViewModel) is the architecture Apple nudged you toward the moment `@ObservableObject` shipped. It's the Toyota Camry of iOS architecture: reliable, widely understood, and nobody gets fired for choosing it.
+
+### 2.1. The Three Layers
+
+```
+  +-------+        calls methods        +----------------+    fetches/saves   +---------+
+  |       |  ─────────────────────────► |                | ─────────────────► |  Model  |
+  | View  |                             |   ViewModel    |                    | Service |
+  |       |  ◄───────────────────────── |  @Observable   | ◄───────────────── |  / API  |
+  +-------+    @Published / binding     +----------------+     async data     +---------+
+```
+
+| Layer | Role | SwiftUI API |
+|:---|:---|:---|
+| **Model** | Pure data structs — no UI knowledge | `Codable`, `Equatable` |
+| **ViewModel** | State + business logic, calls services | `@Observable`, `@ObservableObject` |
+| **View** | Renders state, sends user actions to VM | `@State`, `@Bindable` |
+
+### 2.2. Design Principles
+
+1. **Views are thin** — no business logic in the `body`
+2. **ViewModels are `@Observable` classes** — not structs; reference semantics needed for binding
+3. **Async work lives in the ViewModel** — via `async/await` and `Task`
+4. **Services are injected** — via initializer or environment for testability
+
+---
+
+## 3. TCA — The Disciplined Beast
+
+The Composable Architecture, built by Point-Free's Brandon Williams and Stephen Celis, is what happens when functional programmers look at iOS and say: *"We can make this more predictable."*
+
+They were right. At the cost of some boilerplate and a learning curve that resembles a cliff face.
+
+### 3.1. The Unidirectional Loop
+
+```
+                ┌──────────────────────────────────┐
+                │             Store                │
+  send(.action) │                                  │ new state
+  ┌─────────────►   State  ──►  Reducer  ──► State ├────────────►  View re-renders
+  │             │                   │              │
+  │             │                   └──► Effect    │
+  │             └──────────────────────┬───────────┘
+  │                                    │
+  │              async work            │  feeds back
+  │         (API, timer, etc.)         │  another Action
+  └────────────────────────────────────┘
+```
+
+| Piece | Type | Role |
+|:---|:---|:---|
+| **State** | `struct` (value type) | Single source of truth for all UI state |
+| **Action** | `enum` | Every possible event — user taps, API responses, timers |
+| **Reducer** | Pure function | `(State, Action) → State` + optional `Effect` |
+| **Effect** | `AsyncSequence`-based | Wraps async work; always feeds back an `Action` |
+| **Store** | `ObservableObject` | Holds state, runs reducer, executes effects |
+
+### 3.2. Design Principles
+
+1. **Views send actions** — never mutate state directly
+2. **Reducers are pure** — no side effects inside `reduce(into:action:)`
+3. **All async work is an `Effect`** — cancellable, testable, isolated
+4. **Dependencies are injected** — via `@Dependency`, swappable in tests
+5. **Features compose** — child reducers nest inside parent reducers
+
+---
+
+## 4. Code Side-by-Side
+
+Let's build the same feature in both architectures: a **quote loader** with a counter. The user can increment/decrement a count and fetch a random quote from an API. Simple enough to be readable, complex enough to reveal differences.
+
+### 4.1. MVVM Implementation
+
+```swift:CounterViewModel.swift caption="CounterViewModel.swift" showLineNumbers
+// MARK: - Model
+struct Quote: Decodable, Equatable {
+    let content: String
+    let author: String
+}
+
+// MARK: - ViewModel
+@Observable
+final class CounterViewModel {
+
+    // All state lives here — plain properties
+    var count = 0
+    var quote: Quote? = nil
+    var isLoading = false
+    var errorMessage: String? = nil
+
+    func increment() { count += 1 }
+    func decrement() { count -= 1 }
+
+    func loadQuote() async {
+        isLoading = true
+        errorMessage = nil
+        defer { isLoading = false }
+
+        do {
+            let url = URL(string: "https://api.quotable.io/random")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            quote = try JSONDecoder().decode(Quote.self, from: data)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+// MARK: - View
+struct CounterView: View {
+    @State private var vm = CounterViewModel()
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("\(vm.count)").font(.largeTitle)
+
+            HStack {
+                Button("−") { vm.decrement() }
+                Button("+") { vm.increment() }
+            }
+
+            Button("Load Quote") {
+                Task { await vm.loadQuote() }
+            }
+
+            if vm.isLoading {
+                ProgressView()
+            } else if let q = vm.quote {
+                Text(q.content).italic()
+                Text("— \(q.author)").font(.caption)
+            } else if let err = vm.errorMessage {
+                Text(err).foregroundStyle(.red).font(.caption)
+            }
+        }
+        .padding()
+    }
+}
+```
+
+### 4.2. TCA Implementation
+
+```swift:CounterFeature.swift caption="CounterFeature.swift" showLineNumbers
+import ComposableArchitecture
+
+// MARK: - Feature
+struct CounterFeature: Reducer {
+
+    // 1. All state — a plain struct, value type, Equatable
+    struct State: Equatable {
+        var count = 0
+        var quote: Quote? = nil
+        var isLoading = false
+        var errorMessage: String? = nil
+    }
+
+    // 2. All possible events — exhaustive, explicit
+    enum Action: Sendable, Equatable {
+        case incrementTapped
+        case decrementTapped
+        case loadQuoteTapped
+        case quoteLoaded(Result<Quote, QuoteError>)
+    }
+
+    // 3. Dependency injection — testable by design
+    @Dependency(\.quoteClient) var quoteClient
+
+    // 4. Reducer — pure state machine, no side effects
+    func reduce(into state: inout State, action: Action) -> Effect<Action> {
+        switch action {
+
+        case .incrementTapped:
+            state.count += 1
+            return .none
+
+        case .decrementTapped:
+            state.count -= 1
+            return .none
+
+        case .loadQuoteTapped:
+            state.isLoading = true
+            state.errorMessage = nil
+            // Async work lives in Effect, never in the reducer body
+            return .run { send in
+                await send(.quoteLoaded(
+                    Result { try await quoteClient.fetch() }
+                        .mapError { QuoteError(message: $0.localizedDescription) }
+                ))
+            }
+
+        case let .quoteLoaded(.success(q)):
+            state.isLoading = false
+            state.quote = q
+            return .none
+
+        case let .quoteLoaded(.failure(e)):
+            state.isLoading = false
+            state.errorMessage = e.message
+            return .none
+        }
+    }
+}
+
+// MARK: - View
+struct CounterView: View {
+    let store: StoreOf<CounterFeature>
+
+    var body: some View {
+        WithViewStore(store, observe: { $0 }) { vs in
+            VStack(spacing: 20) {
+                Text("\(vs.count)").font(.largeTitle)
+
+                HStack {
+                    Button("−") { vs.send(.decrementTapped) }
+                    Button("+") { vs.send(.incrementTapped) }
+                }
+
+                Button("Load Quote") { vs.send(.loadQuoteTapped) }
+
+                if vs.isLoading {
+                    ProgressView()
+                } else if let q = vs.quote {
+                    Text(q.content).italic()
+                    Text("— \(q.author)").font(.caption)
+                } else if let err = vs.errorMessage {
+                    Text(err).foregroundStyle(.red).font(.caption)
+                }
+            }
+            .padding()
+        }
+    }
+}
+```
+
+### 4.3. Dependency Client (TCA)
+
+```swift:QuoteClient.swift caption="QuoteClient.swift" showLineNumbers
+struct QuoteClient: Sendable {
+    var fetch: @Sendable () async throws -> Quote
+}
+
+extension QuoteClient: DependencyKey {
+    static let liveValue = QuoteClient(
+        fetch: {
+            let url = URL(string: "https://api.quotable.io/random")!
+            let (data, _) = try await URLSession.shared.data(from: url)
+            return try JSONDecoder().decode(Quote.self, from: data)
+        }
+    )
+
+    static let testValue = QuoteClient(
+        fetch: unimplemented("QuoteClient.fetch")
+    )
+}
+
+extension DependencyValues {
+    var quoteClient: QuoteClient {
+        get { self[QuoteClient.self] }
+        set { self[QuoteClient.self] = newValue }
+    }
+}
+```
+
+---
+
+## 5. Testing
+
+This is where the two architectures diverge most sharply.
+
+### 5.1. Testing MVVM
+
+Testing MVVM async methods requires `XCTestExpectation` or structured concurrency, and you usually need to either inject a mock service or subclass the ViewModel.
+
+```swift:CounterViewModelTests.swift caption="CounterViewModelTests.swift" showLineNumbers
+@MainActor
+final class CounterViewModelTests: XCTestCase {
+
+    func testIncrement() {
+        let vm = CounterViewModel()
+        vm.increment()
+        XCTAssertEqual(vm.count, 1)
+    }
+
+    func testLoadQuote_success() async throws {
+        // You need a custom URLSession or a protocol to inject
+        // — not enforced by the architecture, so every team does it differently
+        let vm = CounterViewModel(urlSession: .mock(returning: fakeQuoteData))
+        await vm.loadQuote()
+        XCTAssertNotNil(vm.quote)
+        XCTAssertFalse(vm.isLoading)
+    }
+
+    func testLoadQuote_failure() async throws {
+        let vm = CounterViewModel(urlSession: .mock(throwing: URLError(.notConnectedToInternet)))
+        await vm.loadQuote()
+        XCTAssertNotNil(vm.errorMessage)
+        XCTAssertFalse(vm.isLoading)
+    }
+}
+```
+
+### 5.2. Testing TCA
+
+TCA's `TestStore` provides deterministic, step-by-step testing. Every state mutation must be explicitly asserted — if you miss one, the test fails.
+
+```swift:CounterFeatureTests.swift caption="CounterFeatureTests.swift" showLineNumbers
+@MainActor
+final class CounterFeatureTests: XCTestCase {
+
+    func testIncrement() async {
+        let store = TestStore(initialState: CounterFeature.State()) {
+            CounterFeature()
+        }
+        await store.send(.incrementTapped) {
+            $0.count = 1  // assert exact state mutation
+        }
+    }
+
+    func testLoadQuote_success() async {
+        let store = TestStore(initialState: CounterFeature.State()) {
+            CounterFeature()
+        } withDependencies: {
+            // Inject a fake client — zero network access
+            $0.quoteClient.fetch = {
+                Quote(content: "Stay hungry.", author: "Jobs")
+            }
+        }
+
+        await store.send(.loadQuoteTapped) {
+            $0.isLoading = true
+        }
+
+        await store.receive(.quoteLoaded(.success(Quote(content: "Stay hungry.", author: "Jobs")))) {
+            $0.isLoading = false
+            $0.quote = Quote(content: "Stay hungry.", author: "Jobs")
+        }
+    }
+
+    func testLoadQuote_failure() async {
+        let store = TestStore(initialState: CounterFeature.State()) {
+            CounterFeature()
+        } withDependencies: {
+            $0.quoteClient.fetch = { throw QuoteError(message: "No internet") }
+        }
+
+        await store.send(.loadQuoteTapped) {
+            $0.isLoading = true
+        }
+
+        await store.receive(.quoteLoaded(.failure(QuoteError(message: "No internet")))) {
+            $0.isLoading = false
+            $0.errorMessage = "No internet"
+        }
+    }
+}
+```
+
+> [!NOTE]
+> `TestStore` exhaustively verifies every state mutation and every received action. If your reducer changes a property you didn't assert on, the test fails immediately. This makes it nearly impossible to write a test that silently misses a regression.
+
+---
+
+## 6. Composing Features
+
+### 6.1. MVVM — Child ViewModels
+
+In MVVM, parent-child communication is informal — you can pass a child ViewModel, use a shared service, or use Combine subjects. There's no enforced pattern.
+
+```swift:AppViewModel.swift caption="AppViewModel.swift" showLineNumbers
+@Observable
+final class AppViewModel {
+    var selectedTab: Tab = .home
+    var counterVM = CounterViewModel()
+    var settingsVM = SettingsViewModel()
+
+    // Cross-feature logic is ad hoc — works, but no guardrails
+    func handleDeepLink(_ url: URL) {
+        if url.host == "counter" {
+            selectedTab = .counter
+        }
+    }
+}
+```
+
+### 6.2. TCA — Composing Reducers
+
+TCA enforces composition through `Scope` and child action forwarding. Cross-feature logic lives explicitly in the parent reducer.
+
+```swift:AppFeature.swift caption="AppFeature.swift" showLineNumbers
+struct AppFeature: Reducer {
+    struct State: Equatable {
+        var selectedTab: Tab = .home
+        var counter = CounterFeature.State()
+        var settings = SettingsFeature.State()
+    }
+
+    enum Action: Sendable {
+        case tabSelected(Tab)
+        case counter(CounterFeature.Action)
+        case settings(SettingsFeature.Action)
+    }
+
+    var body: some ReducerOf<Self> {
+        Scope(state: \.counter, action: /Action.counter) {
+            CounterFeature()
+        }
+        Scope(state: \.settings, action: /Action.settings) {
+            SettingsFeature()
+        }
+        Reduce { state, action in
+            switch action {
+            // Cross-feature logic here — explicit and traceable
+            case .counter(.loadQuoteTapped):
+                state.selectedTab = .counter
+                return .none
+            default:
+                return .none
+            }
+        }
+    }
+}
+```
+
+---
+
+## 7. Pros, Cons & Painful Truths
+
+### 7.1. MVVM
+
+| ✅ Pros | ❌ Cons |
+|:---|:---|
+| Zero learning curve — Apple's own samples use it | No enforced structure — every team does it differently |
+| No third-party dependencies | ViewModels grow to 600+ lines without discipline |
+| Works naturally with all Apple APIs | State can mutate from anywhere, anytime |
+| Easy to onboard new developers | Side effects are not isolated by convention |
+| Fast to prototype and ship | Testing requires custom mock infrastructure |
+
+### 7.2. TCA
+
+| ✅ Pros | ❌ Cons |
+|:---|:---|
+| Completely predictable state mutations | High upfront boilerplate for simple features |
+| First-class testing with `TestStore` | Steep learning curve (2–4 weeks to fluency) |
+| Dependency injection is built in and enforced | Third-party dependency on `swift-composable-architecture` |
+| Scales to large, modular codebases | Overkill for single-screen or CRUD-only apps |
+| Time-travel debugging via `_printChanges` | Macro-heavy — `@Reducer`, `@ObservableState` need understanding |
+| Features compose cleanly | Swift 6 compatibility has sharp edges (see §8) |
+
+> [!NOTE]
+> The dirty secret: most MVVM codebases that "got messy" didn't fail because of MVVM. They failed because there were no conventions around *what goes where*. MVVM is a pattern; TCA is a framework. TCA enforces discipline so you don't have to.
+
+---
+
+## 8. Swift 6 Compatibility Notes
+
+Both architectures have rough edges under strict Swift 6 concurrency.
+
+### MVVM
+
+- `@Observable` classes are `@MainActor`-isolated by default under `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` — which is usually what you want, but can cause `nonisolated` warnings in tests.
+- `async` ViewModel methods called from `Task {}` in `View` are fine, but calling them from background actors requires explicit `await` and `@MainActor` annotations.
+
+### TCA
+
+Building with Swift 6.2 and `SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor` introduces several concrete gotchas:
+
+1. **`@Reducer` macro broken** — Causes circular reference errors in some Xcode versions. Workaround: use `struct Feature: Reducer` with `func reduce(into:action:)` explicitly instead of `var body: some ReducerOf<Self>`.
+
+2. **`nonisolated` required on DTO inits** — Value-type initializers need `nonisolated` annotation when default actor isolation is `MainActor`.
+
+3. **`CancelID` needs `nonisolated(unsafe)`** — Static enums used for effect cancellation must be marked `nonisolated(unsafe)` to satisfy `Sendable`.
+
+4. **Explicit SPM transitive dependencies** — Xcode 26 debug builds don't link transitive SPM dependencies automatically. Add `swift-dependencies`, `swift-clocks`, etc. explicitly to test targets.
+
+---
+
+## 9. When to Use Each
+
+### Use MVVM when…
+
+- You're building a **startup MVP** and velocity matters more than scalability right now
+- Your **team has junior developers** who need to ramp up quickly
+- The app has **mostly independent screens** with isolated, non-shared state
+- You **don't have 2–3 weeks** to absorb a new architecture before shipping
+- Features are **CRUD-heavy** with straightforward async patterns
+
+### Use TCA when…
+
+- You have a **senior team** that can afford the learning investment
+- The app has **deeply shared state** across many features (e.g. a logged-in user that affects every screen)
+- **Testing coverage is a hard requirement** — fintech, health, enterprise
+- You're building a **large modular app** with multiple feature teams owning separate targets
+- You want **guaranteed reproducibility** of bugs — TCA's `_printChanges` logs every action and state diff
+
+### The Hybrid Approach
+
+```
+  MVP / Early stage          Growing app              Large / regulated
+  ─────────────────    ──►   ──────────────   ──►     ─────────────────
+  Pure MVVM                  MVVM + Protocol           TCA everywhere
+  Move fast                  abstractions              or
+  Zero deps                  Add TCA to high-          TCA for complex
+                             complexity features        features,
+                             as they emerge             MVVM for simple
+                                                        leaf screens
+```
+
+MVVM and TCA coexist peacefully in the same codebase. A common migration path: start with MVVM, wrap your services in protocols, and migrate high-complexity features to TCA as the state machine grows unwieldy.
+
+---
+
+## 10. The Verdict
+
+Both architectures work if used with discipline. Both produce unmaintainable code if used carelessly. The architecture is not the problem — the habits are.
+
+| Scenario | Recommendation | Reason |
+|:---|:---:|:---|
+| Personal / side project | MVVM | Don't over-engineer. Ship it. |
+| Startup with small team | MVVM | Speed to market. Refactor later. |
+| Product company, 5+ features | TCA | Investment pays off at scale. |
+| Outsourcing / client handoff | MVVM | Safer for teams with unknown experience. |
+| Fintech / health / regulated | **TCA** | Testing story alone justifies it. |
+| Portfolio / showcase project | **TCA** | Signals architectural maturity to senior reviewers. |
+
+**MVVM is the pragmatic choice. TCA is the principled choice.**
+
+In an ideal world with unlimited time, TCA wins on architecture quality every time. In the real world, well-written MVVM beats poorly-written TCA every single time. Pick the one you can execute *well* given your constraints — and then write some tests. Please.
+
+---
+
+## 11. Further Reading
+
+- [Point-Free: The Composable Architecture](https://github.com/pointfreeco/swift-composable-architecture)
+- [WWDC23: Discover Observation in SwiftUI](https://developer.apple.com/videos/play/wwdc2023/10149/)
+- [FocusLens — A real TCA app from this blog](https://github.com/hoangdh2001/FocusLens)
+- [Point-Free Episodes on TCA](https://www.pointfree.co/collections/composable-architecture)
+
+---
+
+> [!NOTE]
+> Sample code in this post is simplified for clarity. For a full production example using TCA with SwiftData, Core ML, Screen Time API, and WidgetKit, see [FocusLens](https://github.com/hoangdh2001/FocusLens) — a portfolio iOS project covered in a separate post.
