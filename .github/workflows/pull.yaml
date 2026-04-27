@@ -48,6 +48,10 @@ jobs:
       - name: lint
         run: yarn lint
       
+      - name: Get short SHA
+        id: short-sha
+        run: echo "sha=${GITHUB_SHA::7}" >> $GITHUB_OUTPUT
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -62,7 +66,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: ${{ runner.temp }}/.buildx-cache
-          key: ${{ runner.os }}-buildx-${{ github.sha }}
+          key: ${{ runner.os }}-buildx-${{ steps.short-sha.outputs.sha }}
           restore-keys: |
             ${{ runner.os }}-buildx-
 
@@ -73,7 +77,7 @@ jobs:
           file: ./Dockerfile
           push: ${{ github.event_name == 'pull_request' }}
           platforms: linux/amd64 # for mr4x2 server
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.REGISTRY_PREFIX }}:${{ github.sha }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.REGISTRY_PREFIX }}:${{ steps.short-sha.outputs.sha }}
           cache-from: type=local,src=${{ runner.temp }}/.buildx-cache
           cache-to: type=local,dest=${{ runner.temp }}/.buildx-cache-new,mode=max
 
@@ -98,4 +102,4 @@ jobs:
           fi
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
-            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}&docker_tag=${{ github.sha }}"
+            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}&docker_tag=${{ steps.short-sha.outputs.sha }}"
