@@ -6745,7 +6745,7 @@ __metadata:
     eslint-plugin-prettier: ^5.2.0
     github-slugger: ^2.0.0
     gray-matter: ^4.0.2
-    gsap: ^3.13.0
+    gsap: ^3.15.0
     hast-util-from-html-isomorphic: ^2.0.0
     husky: ^9.1.7
     image-size: 1.0.0
@@ -8183,10 +8183,10 @@ __metadata:
   languageName: node
   linkType: hard
 
-"gsap@npm:^3.13.0":
-  version: 3.13.0
-  resolution: "gsap@npm:3.13.0"
-  checksum: 40884726718b5bed8cdd6faa621b3eaec64541b6fc163a0af810d3626d750e5d010f7300f4b106327d4474623a9fd5f915a48081d7744eec38c57a1fce20fb62
+"gsap@npm:^3.15.0":
+  version: 3.15.0
+  resolution: "gsap@npm:3.15.0"
+  checksum: 168f849ef6eee7e0a3f315490edbd3a9e1cd7add03a768bb65953452dc12e6edbe7b24c9a0572e5ea9c911b5294582ad878ac2e4247848678de81854c5c53a27
   languageName: node
   linkType: hard
 
