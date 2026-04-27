@@ -6757,7 +6757,7 @@ __metadata:
     pliny: 0.4.0
     postcss: ^8.4.24
     prettier: ^3.0.0
-    prettier-plugin-tailwindcss: ^0.5.11
+    prettier-plugin-tailwindcss: ^0.8.0
     react: rc
     react-activity-calendar: ^2.7.12
     react-dom: rc
@@ -11419,28 +11419,33 @@ __metadata:
   languageName: node
   linkType: hard
 
-"prettier-plugin-tailwindcss@npm:^0.5.11":
-  version: 0.5.14
-  resolution: "prettier-plugin-tailwindcss@npm:0.5.14"
+"prettier-plugin-tailwindcss@npm:^0.8.0":
+  version: 0.8.0
+  resolution: "prettier-plugin-tailwindcss@npm:0.8.0"
   peerDependencies:
     "@ianvs/prettier-plugin-sort-imports": "*"
+    "@prettier/plugin-hermes": "*"
+    "@prettier/plugin-oxc": "*"
     "@prettier/plugin-pug": "*"
     "@shopify/prettier-plugin-liquid": "*"
     "@trivago/prettier-plugin-sort-imports": "*"
-    "@zackad/prettier-plugin-twig-melody": "*"
+    "@zackad/prettier-plugin-twig": "*"
     prettier: ^3.0
     prettier-plugin-astro: "*"
     prettier-plugin-css-order: "*"
-    prettier-plugin-import-sort: "*"
     prettier-plugin-jsdoc: "*"
     prettier-plugin-marko: "*"
+    prettier-plugin-multiline-arrays: "*"
     prettier-plugin-organize-attributes: "*"
     prettier-plugin-organize-imports: "*"
     prettier-plugin-sort-imports: "*"
-    prettier-plugin-style-order: "*"
     prettier-plugin-svelte: "*"
   peerDependenciesMeta:
     "@ianvs/prettier-plugin-sort-imports":
+      optional: true
+    "@prettier/plugin-hermes":
+      optional: true
+    "@prettier/plugin-oxc":
       optional: true
     "@prettier/plugin-pug":
       optional: true
@@ -11448,17 +11453,17 @@ __metadata:
       optional: true
     "@trivago/prettier-plugin-sort-imports":
       optional: true
-    "@zackad/prettier-plugin-twig-melody":
+    "@zackad/prettier-plugin-twig":
       optional: true
     prettier-plugin-astro:
       optional: true
     prettier-plugin-css-order:
       optional: true
-    prettier-plugin-import-sort:
-      optional: true
     prettier-plugin-jsdoc:
       optional: true
     prettier-plugin-marko:
+      optional: true
+    prettier-plugin-multiline-arrays:
       optional: true
     prettier-plugin-organize-attributes:
       optional: true
@@ -11466,11 +11471,9 @@ __metadata:
       optional: true
     prettier-plugin-sort-imports:
       optional: true
-    prettier-plugin-style-order:
-      optional: true
     prettier-plugin-svelte:
       optional: true
-  checksum: 205a774e53cdd9f8e61640ae3b778402758fad3d215fc57dd31172f12cf2b145095f5f973a431d495a6551b638bbb7e54c9f3a49848f0a0f755f5ad975b7c321
+  checksum: 244db9523019c09bb9e6a0a4659b7def77214de4212c5e3edb6422236fcea0eaa09dacf0ba07fd4edb40f88deeb98986b6064fa449ae1b915fba22b77e3fa28b
   languageName: node
   linkType: hard
 
