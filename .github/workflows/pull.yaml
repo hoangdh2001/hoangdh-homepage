@@ -31,7 +31,7 @@ jobs:
         id: yarn-cache-dir
         run: echo "dir=$(yarn config get cacheFolder)" >> $GITHUB_OUTPUT
       - name: cache global yarn cache
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ steps.yarn-cache-dir.outputs.dir }}
           key: ${{ runner.os }}-yarn-${{ hashFiles('yarn.lock') }}
@@ -39,7 +39,7 @@ jobs:
             ${{ runner.os }}-yarn-
       - name: cache all node_modules
         id: cache-modules
-        uses: actions/cache@v4 # v4
+        uses: actions/cache@v5 # v4
         with:
           path: '**/node_modules'
           key: ${{ runner.os }}-node_modules-${{ hashFiles('yarn.lock', '**/package.json') }}
@@ -63,7 +63,7 @@ jobs:
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Cache Docker layers
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: ${{ runner.temp }}/.buildx-cache
           key: ${{ runner.os }}-buildx-${{ steps.short-sha.outputs.sha }}
