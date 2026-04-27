@@ -73,7 +73,7 @@ jobs:
           file: ./Dockerfile
           push: ${{ github.event_name == 'pull_request' }}
           platforms: linux/amd64 # for mr4x2 server
-          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.REGISTRY_PREFIX }}:pr-${{ github.event.pull_request.number }}
+          tags: ${{ secrets.DOCKERHUB_USERNAME }}/${{ secrets.REGISTRY_PREFIX }}:${{ github.sha }}
           cache-from: type=local,src=${{ runner.temp }}/.buildx-cache
           cache-to: type=local,dest=${{ runner.temp }}/.buildx-cache-new,mode=max
 
@@ -98,4 +98,4 @@ jobs:
           fi
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
-            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}&docker_tag=pr-${{ github.event.pull_request.number }}"
+            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}&docker_tag=${{ github.sha }}"
