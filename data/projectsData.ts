@@ -39,7 +39,7 @@ const projectsData: Project[] = [
     description:
       'Personal website/blog for Do Huy Hoang (@hoangdh2001), designed to showcase blog posts, projects, and personal information. Built with Next.js. Hosted on my Coolify.',
     imgSrc: '',
-    href: 'https://github.com/hoangdh2001/hoangdh-portfolio',
+    href: 'https://github.com/hoangdh2001/hoangdh-homepage',
   },
 ]
 
