@@ -26,4 +26,4 @@ jobs:
           curl -s -o /dev/null -w "%{http_code}" \
             -X DELETE \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
-            "$COOLIFY_BASE_URL/api/v1/preview?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}"
+            "$COOLIFY_BASE_URL/api/v1/applications/$COOLIFY_UUID/previews/${{ github.event.pull_request.number }}"
