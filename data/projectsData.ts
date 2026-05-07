@@ -25,14 +25,14 @@ const projectsData: Project[] = [
     description:
       '7-service Spring Boot and NestJs microservices backend with Kafka async event streaming. Deployed to Kubernetes via Helm + GitLab CI/CD pipelines.',
     imgSrc: '',
-    href: 'https://github.com/hoangdh2001/octopus-be',
+    href: 'https://gitlab.com/nhom-40-khoa-luan-tot-nghiep/octopus-be',
   },
   {
     title: 'Octopus — Real-time Team Collaboration Mobile Client',
     description:
       'Full-stack real-time collaboration platform. Flutter mobile client with Clean Architecture (Data/Domain/Presentation), real-time messaging via Socket.io, push notifications and file sharing.',
     imgSrc: '',
-    href: 'https://github.com/hoangdh2001/octopus-mobile',
+    href: 'https://gitlab.com/nhom-40-khoa-luan-tot-nghiep/octopus-mobile',
   },
   {
     title: 'hoangdh — Personal Portfolio Website',

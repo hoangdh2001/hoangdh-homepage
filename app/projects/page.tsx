@@ -4,7 +4,7 @@ import GithubCalendar from '@/components/Github'
 import SectionContainer from '@/components/SectionContainer'
 import Image from '@/components/Image'
 import Link from '@/components/Link'
-import { Github as GithubIcon } from '@/components/social-icons/icons'
+import { Github as GithubIcon, Gitlab as GitlabIcon } from '@/components/social-icons/icons'
 import Breadcrumb from '@/components/Breadcrumb'
 import type { Metadata } from 'next'
 
@@ -12,6 +12,9 @@ export const metadata: Metadata = genPageMetadata({ title: 'Projects' })
 
 const isGithubUrl = (url?: string) =>
   Boolean(url && /(^https?:\/\/)?(www\.)?github\.com\/.+/i.test(url))
+
+const isGitlabUrl = (url?: string) =>
+  Boolean(url && /(^https?:\/\/)?(www\.)?gitlab\.com\/.+/i.test(url))
 
 export default function Projects() {
   return (
@@ -85,6 +88,9 @@ export default function Projects() {
                           >
                             {isGithubUrl(project.href) && (
                               <GithubIcon className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
+                            )}
+                            {isGitlabUrl(project.href) && (
+                              <GitlabIcon className="h-3.5 w-3.5 fill-current" aria-hidden="true" />
                             )}
                             Learn more
                           </Link>
