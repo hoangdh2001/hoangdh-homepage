@@ -11,6 +11,8 @@ on:
 jobs:
   pr-ci:
     runs-on: ubuntu-latest
+    outputs:
+      short-sha: ${{ steps.short-sha.outputs.sha }}
 
     env:
       CI: true
@@ -107,4 +109,4 @@ jobs:
           fi
           curl -s -o /dev/null -w "%{http_code}" \
             -H "Authorization: Bearer $COOLIFY_TOKEN" \
-            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}&docker_tag=${{ steps.short-sha.outputs.sha }}"
+            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}&docker_tag=${{ needs.pr-ci.outputs.short-sha }}"
