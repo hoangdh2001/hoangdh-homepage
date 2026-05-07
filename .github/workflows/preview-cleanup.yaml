@@ -1,0 +1,29 @@
+name: PR Preview Cleanup
+
+on:
+  pull_request:
+    branches:
+      - main
+    types:
+      - closed
+
+jobs:
+  cleanup-preview:
+    runs-on: ubuntu-latest
+    environment:
+      name: prev
+    steps:
+      - name: Delete Coolify Preview
+        env:
+          COOLIFY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          COOLIFY_BASE_URL: ${{ secrets.COOLIFY_BASE_URL }}
+          COOLIFY_UUID: ${{ secrets.COOLIFY_UUID }}
+        run: |
+          if [ -z "$COOLIFY_TOKEN" ] || [ -z "$COOLIFY_BASE_URL" ] || [ -z "$COOLIFY_UUID" ]; then
+            echo "Coolify secrets not configured, skipping preview cleanup"
+            exit 0
+          fi
+          curl -s -o /dev/null -w "%{http_code}" \
+            -X DELETE \
+            -H "Authorization: Bearer $COOLIFY_TOKEN" \
+            "$COOLIFY_BASE_URL/api/v1/preview?uuid=$COOLIFY_UUID&pr=${{ github.event.pull_request.number }}"
