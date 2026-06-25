@@ -1,0 +1,295 @@
+---
+title: 'Obsidian + Linear + Claude Code: quy trình phát triển phần mềm bằng AI'
+date: '2026-06-25'
+lastmod: '2026-06-25'
+tags: ['claude-code', 'obsidian', 'linear', 'ai-workflow', 'productivity', 'nextjs']
+summary: 'Cách mình kết hợp Obsidian (tri thức), Linear (theo dõi) và Claude Code (thực thi) — cùng ba plugin Superpowers, Product Management và Mgrep — để phát triển phần mềm nhanh mà vẫn có kỷ luật. Kèm sơ đồ Excalidraw và đánh giá thực tế.'
+images: ['/static/blog/obsidian-linear-claude-workflow/fig-1.png']
+authors: ['hoangdh2001']
+---
+
+## 1. Vì sao "AI viết code" thôi là chưa đủ
+
+Ai cũng có thể mở một con AI lên và bảo "viết cho tôi cái trang quản lý đơn hàng". Vài phút sau bạn có code. Vấn đề không nằm ở chỗ _sinh ra code_ — vấn đề nằm ở chỗ **sáu tháng sau**: code đó giải quyết đúng bài toán nào, ai quyết định, dựa trên spec gì, commit nào sửa nó, và làm sao biết nó chưa làm hỏng thứ khác.
+
+Bài viết này không nói về việc gõ prompt cho hay. Nó nói về **một quy trình** mình đang dùng thật để phát triển một sản phẩm phần mềm thực tế — một dự án sống, có deadline — trong đó AI là người thực thi, còn ba lớp công cụ giữ cho mọi thứ không trôi vào hỗn loạn:
+
+- **Obsidian** — nơi tri thức sống: brief, spec, kiến trúc, kế hoạch.
+- **Linear** — nơi công việc được theo dõi: mỗi issue một mã, mỗi phase một project.
+- **Claude Code** — nơi code được sinh ra, có kỷ luật, nhờ các plugin **Superpowers**, **Product Management** và **Mgrep**.
+
+Điểm mấu chốt: AI càng mạnh, **rào chắn (guardrails) và ngữ cảnh (context) càng quan trọng**. Một con AI thiếu ngữ cảnh sẽ tự tin viết sai; một con AI không có hàng rào sẽ commit thẳng lên `main`. Quy trình bên dưới chính là cách mình cấp ngữ cảnh và dựng hàng rào.
+
+> Lưu ý: mọi mã issue, tên branch trong bài là **placeholder generic** (`PROJ-###`) để minh hoạ quy trình, không gắn với bất kỳ dự án cụ thể nào.
+
+---
+
+## 2. Bức tranh tổng thể: một vòng lặp khép kín
+
+Trước khi đi vào từng công cụ, đây là vòng lặp mà **mỗi tính năng** đều đi qua — từ ý tưởng đến lúc lên `main`:
+
+<div style={{ textAlign: 'center' }}>
+  <img
+    id="figure-1"
+    src="/static/blog/obsidian-linear-claude-workflow/fig-1.png"
+    alt="Vòng lặp phát triển: Idea → Obsidian → Linear → Claude Code → Pull Request → Merge"
+    style={{ width: '100%', display: 'block', margin: '0 auto' }}
+  />
+  <p style={{ textAlign: 'center' }}>
+    Hình 1: Vòng lặp "Idea → Ship" — ý tưởng đi qua Obsidian, Linear, Claude Code, rồi
+    về lại dưới dạng issue tiếp theo.
+  </p>
+</div>
+
+Đọc theo chiều kim đồng hồ:
+
+1. **Idea / Brief** — một nhu cầu xuất hiện (một yêu cầu mới từ người dùng, chẳng hạn).
+2. **Obsidian** — mình (hoặc Claude) viết spec + plan, lưu trong `02-design/` và `04-planning/`.
+3. **Linear** — tạo issue (ví dụ `PROJ-###`), gắn vào đúng project (phase).
+4. **Claude Code** — tạo branch theo issue, brainstorm, viết plan, làm TDD, build.
+5. **Pull Request** — Husky + CI chặn ở cửa: lint, type-check, build, test.
+6. **Merge to main** — commit `Closes PROJ-###` tự đóng issue, cập nhật `CHANGELOG`.
+7. Vòng lặp quay lại với **issue tiếp theo**.
+
+Cái hay không phải là từng bước, mà là **mỗi bước để lại dấu vết ở một nơi có thể tra cứu**: ý định nằm ở Obsidian, trạng thái nằm ở Linear, thay đổi nằm ở Git. AI nối ba nơi đó lại.
+
+---
+
+## 3. Obsidian — tầng tri thức (context engine)
+
+Đây là phần hầu hết mọi người bỏ qua khi dùng AI, và cũng là phần tạo ra khác biệt lớn nhất. **Claude chỉ giỏi bằng ngữ cảnh bạn cấp cho nó.** Obsidian là cái kho ngữ cảnh đó.
+
+Vault được tổ chức theo vòng đời, đánh số để dễ điều hướng:
+
+```text:vault-structure.txt caption="Cấu trúc Obsidian vault" showLineNumbers
+project-vault/
+  00-Wiki.md            # trang chủ, mục lục
+  01-brief/             # brief sản phẩm, mục tiêu kinh doanh
+  02-design/            # spec tính năng, wireframe (.excalidraw), mockup, brand
+    specs/  plans/  mockups/  brand/
+  03-architecture/      # quyết định kỹ thuật cấp hệ thống
+  04-planning/          # Roadmap.md, Features.md, MVP scope.md, Todo.md
+  05-development/        # ghi chú khi code
+  adr/                  # Architecture Decision Records (ADR-001, 002, ...)
+  tools/                # Branch conventions.md, Commit conventions.md, ...
+```
+
+Vài thói quen làm nó hiệu quả với AI:
+
+- **Spec và plan đặt tên theo Linear ID**: `proj-142-reports-page.md`. Nhờ vậy issue ↔ spec ↔ branch ↔ PR khớp nhau, và mình chỉ cần nói với Claude _"đọc spec proj-142"_ là nó tự lấy qua Obsidian MCP.
+- **Quy ước viết thành văn bản, không nằm trong đầu**: `tools/Branch conventions.md`, `tools/Commit conventions.md`. Chúng được trích vào `AGENTS.md` của repo nên Claude tuân theo mà không cần nhắc lại.
+- **Wireframe sống chung với spec**: trong `02-design/` có cả file `.excalidraw` (ví dụ `home-wireframe.excalidraw`).
+- **ADR cho quyết định lớn**: "vì sao chia thành nhiều repo", "vì sao chọn stack này" được chốt một lần ở `adr/`, để sáu tháng sau không ai (kể cả AI) đặt lại câu hỏi đã trả lời.
+
+> Nguyên tắc: thứ gì _không suy ra được từ code_ thì phải nằm ở Obsidian. Tên biến suy ra được từ code — đừng ghi. Lý do chọn một cổng thanh toán thay vì cổng khác thì không — phải ghi.
+
+Claude đọc vault qua **Obsidian MCP**, nên khi bắt đầu một tính năng, nó không đoán mò: nó đọc brief, đọc spec, đọc ADR liên quan, rồi mới đề xuất.
+
+---
+
+## 4. Linear — tầng theo dõi (single source of truth của công việc)
+
+Nếu Obsidian trả lời _"cái gì và tại sao"_, thì Linear trả lời _"đang ở đâu và ai làm"_.
+
+Cấu trúc mình dùng:
+
+- **Một team trong Linear** — mọi issue mang một tiền tố cố định (ví dụ `PROJ-`).
+- **Project = Phase**: roadmap được chia thành các project tuần tự (Phase 0, Phase 1, Phase 2...). Mỗi project có mục tiêu, phạm vi, ngày bắt đầu/kết thúc rõ ràng.
+- **Issue → Branch → PR**: mỗi issue đẻ ra đúng một branch, theo chuẩn [Conventional Branch](https://conventional-branch.github.io/).
+
+Quy ước branch:
+
+```bash:branch-naming.sh caption="Quy ước đặt tên branch" showLineNumbers
+# <type>/proj-<id>-<mô-tả-tiếng-anh-kebab-case>
+feature/proj-142-reports-page-charts
+bugfix/proj-128-fix-empty-state
+chore/proj-136-update-ci-runner
+
+# Lưu ý: Linear "Copy branch name" sinh ra "username/proj-..."
+# — KHÔNG đúng chuẩn. Phải đổi tên bỏ tiền tố username.
+```
+
+Và đây là chỗ "ma thuật" nhỏ nhưng quan trọng: trong commit/PR mình ghi footer `Closes PROJ-142`. Khi PR merge vào `main`, Linear **tự động đóng issue**. Không có bước cập nhật trạng thái thủ công nào bị quên. Nhờ kỷ luật này, **mọi PR đều gắn mã issue** — không cái nào lọt lưới:
+
+```text:git-log.txt caption="git log --oneline (minh hoạ)" showLineNumbers
+feat(auth): Add login with email + password (PROJ-12) (#34)
+feat(orders): Add status filter to list (PROJ-15) (#37)
+fix(orders): Handle empty state on dashboard (PROJ-18) (#40)
+chore(ci): Set up GitHub Actions workflow (PROJ-21) (#43)
+```
+
+Một mã issue duy nhất ráp được: spec (Obsidian) ↔ task (Linear) ↔ branch (Git) ↔ commit ↔ PR ↔ CHANGELOG. Đó là "trí nhớ dài hạn" mà AI không có sẵn, và mình cấp cho nó bằng kỷ luật đặt tên.
+
+---
+
+## 5. Bốn tầng phối hợp với nhau như thế nào
+
+Gộp lại, hệ thống có bốn tầng. Mỗi tầng làm đúng một việc, và Claude là sợi chỉ xuyên qua cả bốn:
+
+<div style={{ textAlign: 'center' }}>
+  <img
+    id="figure-2"
+    src="/static/blog/obsidian-linear-claude-workflow/fig-2.png"
+    alt="Bốn tầng: Knowledge (Obsidian), Tracking (Linear), Execution (Claude Code + plugins), Guardrails (Husky + CI)"
+    style={{ width: '100%', display: 'block', margin: '0 auto' }}
+  />
+  <p style={{ textAlign: 'center' }}>
+    Hình 2: Bốn tầng — Tri thức, Theo dõi, Thực thi, Rào chắn.
+  </p>
+</div>
+
+| Tầng | Công cụ | Trả lời câu hỏi |
+| :--- | :--- | :--- |
+| **Knowledge** | Obsidian | _Cái gì? Tại sao?_ |
+| **Tracking** | Linear | _Đang ở đâu? Ai làm? Phase nào?_ |
+| **Execution** | Claude Code + Superpowers / Product Management / Mgrep | _Làm như thế nào?_ |
+| **Guardrails** | Husky (commitlint, lint-staged, pre-push) + GitHub Actions (CI/CD) | _Có an toàn để merge & deploy không?_ |
+
+Tách bạch thế này nghĩa là khi một tầng đổi, các tầng khác không sập. Đổi cách đặt issue trong Linear không đụng tới spec; thêm một CI check không đụng tới cách viết spec.
+
+---
+
+## 6. Claude Code + ba plugin — tầng thực thi
+
+Đây là nơi ba plugin được hỏi tới phát huy tác dụng. Mỗi cái giải một bài toán khác nhau.
+
+### 6.1. Superpowers — biến AI từ "tự do" thành "có kỷ luật"
+
+Mặc định, một con AI sẽ nhảy thẳng vào viết code. Đó là cái bẫy lớn nhất: nó code rất nhanh _một thứ sai_. Superpowers áp một bộ **skill quy trình** mà Claude buộc phải đi qua _trước_ khi gõ dòng code đầu tiên:
+
+- **`brainstorming`** — làm rõ ý định và yêu cầu trước khi thiết kế. Không brainstorm xong thì không được lập plan.
+- **`writing-plans`** — biến yêu cầu thành plan nhiều bước, có checkpoint, _trước khi_ đụng vào code.
+- **`test-driven-development`** — viết test (đỏ) → code cho xanh. TDD đặc biệt hợp với AI: test là cái "hợp đồng" giữ cho AI không trôi khỏi yêu cầu.
+- **`systematic-debugging`** — khi có bug, tái hiện → cô lập → chẩn đoán → sửa, thay vì đoán bừa.
+- **`requesting-code-review`** & **`verification-before-completion`** — _bằng chứng trước khi tuyên bố xong_. Phải chạy lệnh kiểm chứng và dán output ra, không được nói "đã xong" suông.
+- **`using-git-worktrees`** — cô lập việc đang làm khỏi workspace hiện tại.
+
+Giá trị thật sự của Superpowers không phải là làm AI _thông minh hơn_, mà là làm nó **kỷ luật hơn** — đúng cái mà developer junior thiếu, và cũng là cái AI thiếu nếu để tự do.
+
+### 6.2. Product Management — chiếc cầu giữa ý tưởng và backlog
+
+Plugin Product Management mang theo các skill kiểu PM: `write-spec`, `product-brainstorming`, `roadmap-update`, `sprint-planning`, `synthesize-research`, `metrics-review`, `stakeholder-update`... Nó kết nối thẳng với Linear, Notion và file spec.
+
+Trong vòng lặp ở Hình 1, đây chính là tầng biến **một câu nói mơ hồ của người dùng** thành **spec + issue có cấu trúc**:
+
+- _"Muốn xem báo cáo doanh thu"_ → `write-spec` → một spec với mục tiêu, non-goals, success metrics, acceptance criteria → lưu vào Obsidian `02-design/specs/`.
+- Spec đó → `roadmap-update` / `sprint-planning` → đặt vào đúng phase trong Linear, kèm ước lượng.
+- Kết quả: một tính năng báo cáo (issue `PROJ-142`) ra đời _có chủ đích_, không phải code đại rồi sửa.
+
+Nói cách khác: Superpowers lo _"code cho đúng cách"_, Product Management lo _"code cho đúng việc"_.
+
+### 6.3. Mgrep — tìm kiếm ngữ nghĩa, thay cho grep mù
+
+Mgrep thay thế toàn bộ tìm kiếm bằng grep/glob/web search bằng **tìm kiếm theo ngữ nghĩa**. Mình mô tả thứ cần tìm bằng ngôn ngữ tự nhiên, nó trả về đúng đoạn code/đường dẫn liên quan.
+
+Hai chỗ nó cứu thời gian nhất:
+
+- **Tìm để tái sử dụng trước khi viết mới.** Trước khi tạo một component mới, hỏi _"chỗ nào đang có data table với filter và phân trang?"_ — Mgrep chỉ ra ngay, tránh viết lại (thường codebase đã có sẵn pattern cho data table, form, upload ảnh...).
+- **Tra cứu API mới.** Một dự án chạy **Next.js / React bản mới** thường có API khác với những gì model được huấn luyện. `mgrep --web` giúp tra nhanh cú pháp/thay đổi thay vì bịa ra API cũ.
+
+Với một codebase đang phình to qua từng phase, "tìm đúng chỗ" quan trọng ngang "viết đúng code".
+
+---
+
+## 7. Vòng đời một issue — đi qua từng bước
+
+Ghép tất cả lại, đây là vòng đời thực tế của **một** issue, lấy ví dụ `PROJ-142` (một trang báo cáo + biểu đồ):
+
+<div style={{ textAlign: 'center' }}>
+  <img
+    id="figure-3"
+    src="/static/blog/obsidian-linear-claude-workflow/fig-3.png"
+    alt="Vòng đời một issue từ Linear đến merge, đi qua Superpowers, Mgrep, commitlint, CI"
+    style={{ width: '100%', display: 'block', margin: '0 auto' }}
+  />
+  <p style={{ textAlign: 'center' }}>
+    Hình 3: Vòng đời một issue — chạy hình chữ U, từ Linear xuống TDD, vòng qua
+    Mgrep, rồi lên lại tới merge.
+  </p>
+</div>
+
+1. **Linear** — issue `PROJ-142` chuyển `Todo → In Progress`.
+2. **Branch** — `feature/proj-142-reports-page-charts`.
+3. **Brainstorm + Plan** — Superpowers buộc làm rõ yêu cầu và viết plan trước.
+4. **TDD** — viết test trước, code sau cho xanh.
+5. **Mgrep** — tìm chart/component có sẵn để tái sử dụng thay vì dựng lại.
+6. **Commit** — `feat(web): Add reports page with charts (PROJ-142)`; hook `commit-msg` chạy commitlint kiểm tra ngay.
+7. **PR** — GitHub Actions chạy lint, type-check, build, test.
+8. **Merge** — `Closes PROJ-142` đóng issue + ghi vào `CHANGELOG`.
+
+Để ý: con người vẫn nằm trong vòng lặp ở những điểm quyết định (duyệt plan ở bước 3, review PR ở bước 7). AI làm phần nặng nhọc; con người giữ phán đoán.
+
+---
+
+## 8. Rào chắn tự động — thứ giữ AI không "tự bắn vào chân"
+
+Càng để AI chạy nhanh, rào chắn càng phải chắc. Trong dự án, hàng rào là tự động và _không thể bỏ qua vô tình_:
+
+```bash:.husky/pre-push caption=".husky/pre-push — chặn push thẳng lên main" showLineNumbers
+protected="main"
+while read -r local_ref local_sha remote_ref remote_sha; do
+  if [ "${remote_ref}" = "refs/heads/${protected}" ]; then
+    echo "❌ Direct push to '${protected}' is blocked. Open a PR instead." >&2
+    echo "   To force a push (genuine hotfix): git push --no-verify" >&2
+    exit 1
+  fi
+done
+```
+
+- **`commit-msg`** → commitlint ép đúng Conventional Commits (type whitelist + độ dài header).
+- **`pre-commit`** → lint-staged chạy ESLint + Prettier trên file staged.
+- **`pre-push`** → chặn push thẳng lên `main` (thay cho ruleset của GitHub mà gói free không cho bật trên private repo). Hotfix thật mới dùng `--no-verify`.
+- **CI/CD** → GitHub Actions (lint, type-check, build, test) + deploy tự động sau khi merge.
+- **Ngôn ngữ** → code/repo/commit/branch **chỉ tiếng Anh**, để grep được và thân thiện với người ngoài. (Tiếng Việt sống ở Linear, Notion, Obsidian — như chính bài blog này.)
+
+Triết lý: **AI có thể đề xuất bất cứ gì, nhưng chỉ thứ qua được hàng rào mới lên `main`.** Hàng rào không phân biệt code do người hay AI viết — và đó là điểm mạnh.
+
+---
+
+## 9. Đánh giá thẳng thắn
+
+Sau nhiều issue chạy qua quy trình này, đây là điều thật sự xảy ra — cả tốt lẫn chưa tốt.
+
+### Được gì
+
+- **Tốc độ kèm dấu vết.** Mỗi PR đều gắn mã issue, commit theo chuẩn, CHANGELOG sạch. Đi nhanh _mà vẫn_ truy vết được — hai thứ thường đánh đổi nhau thì ở đây đi cùng nhau.
+- **Spec-first cắt giảm làm lại.** Vì tính năng có spec trước, AI hiếm khi "code lạc đề". Bước đắt nhất (làm lại từ đầu) gần như biến mất.
+- **Onboarding gần như tức thì.** Mở một issue bất kỳ là lần ngược ra được toàn bộ ngữ cảnh. Người mới — hoặc một phiên Claude mới — bắt nhịp trong vài phút.
+- **Phase hóa giữ phạm vi.** Roadmap chia phase trong Linear khiến "tính năng hay ho phát sinh" được xếp vào phase sau thay vì phình phase hiện tại.
+
+### Mất gì / phải đánh đổi
+
+- **Chi phí thiết lập trả trước.** Vault, quy ước, hook, CI — tất cả tốn công dựng. Với script một lần thì không đáng; với dự án sống nhiều tháng thì hoàn vốn nhanh.
+- **AI vẫn cần người gác cổng.** Chọn thiết bị/quyết định thiết kế, duyệt plan, review PR — vẫn là việc của con người. Tự động ~80%, 20% còn lại cần phán đoán.
+- **Môi trường local "dối" được.** Có lúc do lệch phiên bản một package nội bộ, `pnpm build` / `type-check` / full `test` **không pass local** dù code đúng — phải kiểm chứng theo phạm vi hẹp và tin vào CI. Bài học: đừng để AI tuyên bố "xong" chỉ vì lệnh local xanh; **CI mới là trọng tài** (đúng tinh thần skill `verification-before-completion`).
+- **Kỷ luật phải được _ép_, không phải _mong đợi_.** Nếu không có Husky/commitlint, sớm muộn cũng có commit lạc chuẩn. Hàng rào tự động > thiện chí.
+
+---
+
+## 10. Áp dụng cho dự án của bạn — checklist
+
+Không cần làm tất cả ngay. Thứ tự mình khuyên:
+
+- [ ] **Một file `AGENTS.md` (hoặc `CLAUDE.md`)** ghi quy ước branch, commit, lệnh pre-commit. Đây là đòn bẩy lớn nhất, rẻ nhất.
+- [ ] **Một vault Obsidian** tối thiểu: `brief/`, `specs/`, `adr/`. Nối Obsidian MCP để Claude đọc được.
+- [ ] **Linear (hoặc tương đương)** với quy ước issue ID, gắn ID vào branch + commit footer.
+- [ ] **Husky**: `commit-msg` (commitlint), `pre-commit` (lint-staged), `pre-push` (chặn `main`).
+- [ ] **Bật các skill quy trình của Superpowers** — đặc biệt là brainstorm trước khi code và TDD.
+- [ ] **Dùng Product Management** để biến yêu cầu mơ hồ thành spec _trước_ khi tạo issue.
+- [ ] **Dùng Mgrep** để tìm đồ tái sử dụng trước khi viết mới, và tra API framework mới.
+- [ ] **CI là trọng tài**, không phải máy local.
+
+---
+
+## 11. Kết
+
+AI không thay thế quy trình — nó **khuếch đại** quy trình bạn đang có. Quy trình tốt × AI = nhanh và chắc. Quy trình lộn xộn × AI = lộn xộn nhanh hơn.
+
+Công thức mình rút ra rất gọn:
+
+> **Obsidian cấp _ngữ cảnh_. Linear cấp _trật tự_. Superpowers cấp _kỷ luật_. Product Management cấp _đúng việc_. Mgrep cấp _trí nhớ_. Còn Husky + CI là _trọng tài_.**
+
+Claude Code đứng giữa, nối tất cả lại và làm phần nặng. Vai trò của bạn dịch chuyển từ "người gõ code" sang "người dựng hệ thống và giữ phán đoán" — và đó là một nâng cấp đáng giá.
+
+> [!NOTE]
+> Ba sơ đồ trong bài được vẽ bằng MCP **Excalidraw** và xuất ảnh bằng **Excalidraw export MCP** — đúng quy trình "AI là người thực thi" mà bài viết mô tả. File nguồn `.excalidraw` nằm cạnh ảnh trong `public/static/blog/obsidian-linear-claude-workflow/`, có thể mở lại để chỉnh.
