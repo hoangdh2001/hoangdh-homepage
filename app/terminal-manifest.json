@@ -33,11 +33,6 @@
   ],
   "files": [
     {
-      "name": "obsidian-linear-claude-workflow.mdx",
-      "path": "/blog/obsidian-linear-claude-workflow.mdx",
-      "route": "/blog/obsidian-linear-claude-workflow"
-    },
-    {
       "name": "apple-ui-test-automation-plugin.mdx",
       "path": "/blog/apple-ui-test-automation-plugin.mdx",
       "route": "/blog/apple-ui-test-automation-plugin"
@@ -56,6 +51,11 @@
       "name": "mvvm-vs-tca-swiftui.mdx",
       "path": "/blog/mvvm-vs-tca-swiftui.mdx",
       "route": "/blog/mvvm-vs-tca-swiftui"
+    },
+    {
+      "name": "obsidian-linear-claude-workflow.mdx",
+      "path": "/blog/obsidian-linear-claude-workflow.mdx",
+      "route": "/blog/obsidian-linear-claude-workflow"
     },
     {
       "name": "stack-and-queue.mdx",
