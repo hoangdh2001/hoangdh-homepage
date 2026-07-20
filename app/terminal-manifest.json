@@ -38,6 +38,11 @@
       "route": "/blog/apple-ui-test-automation-plugin"
     },
     {
+      "name": "claude-code-agent-teams.mdx",
+      "path": "/blog/claude-code-agent-teams.mdx",
+      "route": "/blog/claude-code-agent-teams"
+    },
+    {
       "name": "focuslens-ios-distraction-blocker.mdx",
       "path": "/blog/focuslens-ios-distraction-blocker.mdx",
       "route": "/blog/focuslens-ios-distraction-blocker"
