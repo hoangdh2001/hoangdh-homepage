@@ -1,0 +1,269 @@
+---
+title: 'Agent Teams trong Claude Code: khi một con AI là chưa đủ'
+date: '2026-07-20'
+lastmod: '2026-07-20'
+tags: ['claude-code', 'agent-teams', 'multi-agent', 'ai-workflow', 'productivity']
+summary: 'Một phiên Claude Code giỏi đến mấy vẫn chỉ là một người: một luồng làm việc, một context, một góc nhìn. Agent Teams cho mình chạy hẳn một team — lead, implementer, reviewer, debugger — làm việc song song như team thật. Bài này là cách mình dùng nó qua plugin agent-teams, kèm sơ đồ Excalidraw và đánh giá thẳng thắn về chi phí.'
+images: ['/static/blog/claude-code-agent-teams/fig-1.png']
+authors: ['hoangdh2001']
+---
+
+## 1. Vì sao một con AI là chưa đủ
+
+Trong [bài trước](/blog/obsidian-linear-claude-workflow), mình kể về quy trình Obsidian + Linear + Claude Code — nơi AI là _người thực thi_ có kỷ luật. Nhưng để ý kỹ thì quy trình đó có một giới hạn ngầm: **chỉ có một người thực thi**. Một phiên Claude Code, dù giỏi đến mấy, vẫn là một người: làm tuần tự từng việc, nhìn vấn đề bằng một góc nhìn, và mang một context window sẽ đầy dần theo độ dài cuộc trò chuyện.
+
+Trong khi đó, sức mạnh của một team người thật không nằm ở chỗ có nhiều tay gõ phím hơn — mà ở chỗ **các thành viên nhìn cùng một vấn đề từ những hướng khác nhau và phản biện lẫn nhau**: một feature lớn được chia cho nhiều người làm song song, một PR được review bởi người lo security lẫn người lo performance, một bug khó được mổ xẻ bằng nhiều giả thuyết cạnh tranh.
+
+**Agent Teams** — tính năng thử nghiệm của Claude Code — mang đúng mô hình đó vào AI: một phiên chính làm **team lead**, các phiên Claude Code độc lập khác làm **teammate**, có task list chung và nhắn tin qua lại được với nhau. Bài này không nói về việc mở nhiều tab terminal chạy nhiều Claude riêng lẻ. Nó nói về một **team đúng nghĩa** — có phân công, có ranh giới, có giao tiếp — và cách mình vận hành nó hàng ngày qua plugin **agent-teams**.
+
+> Lưu ý: Agent Teams đang là tính năng **experimental** (phải bật cờ mới dùng được), hành vi có thể thay đổi theo phiên bản. Mọi mô tả trong bài dựa trên tài liệu chính thức của Claude Code, tài liệu của plugin agent-teams, và trải nghiệm thực tế của mình tại thời điểm viết.
+
+---
+
+## 2. Agent Teams là gì — và khác gì subagent
+
+Claude Code vốn đã có **subagent**: bạn giao một việc, nó chạy trong nền, xong thì trả kết quả về phiên chính. Subagent giống một cộng tác viên thời vụ — làm xong một việc rồi biến mất, không bàn bạc gì với ai. Teammate trong Agent Teams thì khác hẳn:
+
+| | **Subagent** | **Teammate (Agent Teams)** |
+| :--- | :--- | :--- |
+| Bản chất | Task chạy trong phiên hiện tại | Một phiên Claude Code **độc lập, đầy đủ** |
+| Context | Context riêng nhưng dùng xong bỏ — chỉ tóm tắt trả về phiên chính | Context window **riêng**, tự đọc CLAUDE.md, MCP, skills |
+| Giao tiếp | Chỉ báo cáo về phiên chính | **Nhắn tin trực tiếp cho nhau**, có task list chung |
+| Bạn tương tác | Chỉ qua phiên chính | Nói chuyện thẳng với **từng teammate** |
+| Chi phí token | Thấp hơn | Cao hơn đáng kể (mỗi teammate là một Claude riêng) |
+| Hợp với | Việc gọn, chỉ cần kết quả | Việc phức tạp cần **bàn bạc và phối hợp** |
+
+Kiến trúc của một team gồm bốn thành phần:
+
+<div style={{ textAlign: 'center' }}>
+  <img
+    id="figure-1"
+    src="/static/blog/claude-code-agent-teams/fig-1.png"
+    alt="Kiến trúc Agent Teams: bạn nói chuyện với team lead, lead phối hợp các teammate, tất cả chia sẻ task list chung và nhắn tin qua mailbox"
+    style={{ width: '100%', display: 'block', margin: '0 auto' }}
+  />
+  <p style={{ textAlign: 'center' }}>
+    Hình 1: Kiến trúc một team — lead điều phối, teammates làm song song, task list là bảng
+    phân công, mailbox là kênh chat nội bộ.
+  </p>
+</div>
+
+1. **Team lead** — chính là phiên bạn đang gõ. Lead chia việc, giao task, tổng hợp kết quả. Vai trò này cố định suốt phiên.
+2. **Teammates** — các phiên Claude Code riêng biệt. Mỗi teammate tự load ngữ cảnh dự án (CLAUDE.md, MCP servers, skills) như một phiên bình thường, **nhưng không thừa hưởng lịch sử hội thoại của lead** — chi tiết này quan trọng, mình sẽ quay lại ở phần đánh giá.
+3. **Task list chung** — mỗi task có trạng thái (pending / in progress / completed) và có thể phụ thuộc task khác; task bị chặn sẽ **tự mở khóa** khi task chặn nó hoàn thành. Teammate rảnh có thể tự nhận task tiếp theo.
+4. **Mailbox** — hệ thống nhắn tin giữa các agent. Tin được đưa đến tự động; cả trạng thái rảnh rỗi của teammate cũng được báo về lead qua kênh này.
+
+Điểm mấu chốt: subagent là _fan-out một chiều_ — giao việc, nhận kết quả. Agent Teams là _cộng tác hai chiều_ — các teammate chia sẻ phát hiện, chất vấn lẫn nhau, và tự phối hợp. Tóm gọn: dùng subagent khi cần **worker nhanh gọn báo cáo về**; dùng team khi các thành viên cần **thảo luận với nhau**.
+
+---
+
+## 3. Bật tính năng và chọn chế độ hiển thị
+
+Agent Teams mặc định tắt. Bật bằng biến môi trường trong `settings.json`:
+
+```json:settings.json caption="Bật Agent Teams trong ~/.claude/settings.json" showLineNumbers
+{
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+  },
+  "teammateMode": "tmux"
+}
+```
+
+`teammateMode` quyết định bạn _nhìn thấy_ teammates như thế nào:
+
+- **`in-process`** (mặc định) — teammates chạy ngay trong phiên chính và hiện ở **agent panel** dưới ô nhập lệnh: chọn bằng phím mũi tên, Enter để mở transcript và nhắn trực tiếp cho từng teammate. Gọn, hợp với CI.
+- **`tmux`** — mỗi teammate một pane tmux, nhìn được tất cả cùng lúc. Đây là chế độ mình dùng: cảm giác như ngồi giữa một phòng dev, liếc qua là biết ai đang làm gì. Cần tmux có sẵn trong PATH; kinh nghiệm của mình là khởi động sẵn một session tmux trước khi spawn để pane hiện đúng chỗ.
+- **`iterm2`** — mỗi teammate một split pane native của iTerm2 (chỉ macOS; cần cài CLI `it2` và bật Python API của iTerm2).
+- **`auto`** — đang ngồi trong tmux (hoặc iTerm2 có `it2`) thì split pane, không thì rơi về in-process.
+
+Một tùy chọn dễ bỏ qua: teammate **không tự dùng model bạn chọn bằng `/model`** — muốn kiểm soát model của cả team thì vào `/config` chỉnh "Default teammate model" (chọn "Default (leader's model)" nếu muốn đồng bộ với lead). Đáng chỉnh, vì chi phí của team nhân theo số thành viên.
+
+---
+
+## 4. Plugin agent-teams — đội hình có sẵn thay vì tự dựng từ đầu
+
+Tính năng gốc cho bạn "nguyên liệu": spawn teammate, task list, mailbox. Nhưng dùng tay không thì mỗi lần lập team lại phải mô tả lại từ đầu: ai làm gì, ranh giới ở đâu, giao tiếp kiểu gì. Plugin **agent-teams** (trong marketplace `claude-code-workflows`) đóng gói sẵn phần đó thành bốn **role** và một bộ lệnh `/team-*`.
+
+Bốn role, mỗi role một "tính cách" được định nghĩa kỹ:
+
+- **`team-lead`** — người điều phối: chia việc thành các luồng song song kèm ranh giới file, giao task, theo dõi tiến độ, tổng hợp kết quả. Nguyên tắc hay nhất của role này: _"bias toward smaller teams"_ — thiên về team nhỏ.
+- **`team-implementer`** — người xây: chỉ được sửa **đúng những file được giao**, gặp file ngoài ranh giới thì nhắn lead chứ không tự tiện đụng vào. Làm xong phải tự verify (build, lint, test) rồi mới báo cáo.
+- **`team-reviewer`** — người soi: mỗi reviewer chỉ soi **một chiều duy nhất** (security, performance, architecture, testing hoặc accessibility), báo cáo theo format thống nhất kèm `file:line` cho từng phát hiện — và được dặn kỹ: không có gì thì nói "không có gì", đừng bịa ra vấn đề cho có.
+- **`team-debugger`** — thám tử: mỗi debugger nhận **đúng một giả thuyết** về nguyên nhân bug và đi tìm bằng chứng xác nhận _hoặc bác bỏ_ nó. Giả thuyết bị bác bỏ cũng là kết quả quý — nó thu hẹp không gian tìm kiếm.
+
+Còn bộ lệnh là các quy trình đóng gói:
+
+| Lệnh | Làm gì |
+| :--- | :--- |
+| `/team-spawn` | Lập team theo preset: `review`, `debug`, `feature`, `fullstack`, `research`, `security`, `migration` hoặc `custom` |
+| `/team-feature` | Phát triển một feature bằng nhiều implementer song song (xem mục 6) |
+| `/team-review` | Review đa chiều một thư mục, một diff, hoặc một PR |
+| `/team-debug` | Debug bằng các giả thuyết cạnh tranh |
+| `/team-status` | Bảng trạng thái: ai đang làm gì, task nào xong, % tiến độ |
+| `/team-delegate` | Dashboard phân việc: giao task, nhắn teammate, cân bằng lại workload |
+| `/team-shutdown` | Giải tán team một cách tử tế (teammate được làm nốt việc dở) |
+
+Nói cách khác: tính năng gốc lo _"chạy được"_, plugin lo _"chạy có bài bản"_.
+
+---
+
+## 5. Quy tắc vàng: mỗi file đúng một chủ
+
+Câu hỏi đầu tiên ai cũng hỏi khi nghe "nhiều AI sửa code song song": **không giẫm chân nhau à?** Câu trả lời nằm ở quy tắc quan trọng nhất của toàn bộ mô hình — **one owner per file**: không file nào được giao cho hai implementer. Ranh giới, contract và file dùng chung — ba khái niệm sẽ được giải thích ngay dưới — nhìn tổng thể như sau:
+
+<div style={{ textAlign: 'center' }}>
+  <img
+    id="figure-2"
+    src="/static/blog/claude-code-agent-teams/fig-2.png"
+    alt="Hai implementer, mỗi người một vùng file riêng; team lead giữ file dùng chung; ở giữa là file contract chỉ-đọc cả hai cùng import; index.ts là điểm dễ conflict, chỉ một chủ duy nhất"
+    style={{ width: '100%', display: 'block', margin: '0 auto' }}
+  />
+  <p style={{ textAlign: 'center' }}>
+    Hình 2: Ranh giới ownership — mỗi implementer một vùng, contract ở giữa là bất khả xâm
+    phạm, file dùng chung do lead giữ.
+  </p>
+</div>
+
+Lead chia ranh giới theo một trong ba cách, tùy hình dạng của feature:
+
+- **Theo thư mục** — implementer-1 giữ `src/components/auth/`, implementer-2 giữ `src/api/auth/`.
+- **Theo module** — người lo authentication, người lo authorization.
+- **Theo tầng** — UI / business logic / data, mỗi người một tầng.
+
+Chỗ hai luồng chạm nhau thì sao? Đó là lúc cần **interface contract**: một file định nghĩa kiểu dữ liệu hoặc API chung (ví dụ `src/types/auth-contract.ts`) được chốt _trước khi_ ai bắt đầu code. Cả hai bên cùng import nó, nhưng **không ai được tự ý sửa** — muốn đổi contract phải qua lead. Thay vì ngồi đợi phía bên kia xong, mỗi bên tự stub/mock phần của đối phương.
+
+Hai cái bẫy mình từng dính, chia sẻ để bạn né:
+
+- **Bẫy barrel file.** Chia ownership rồi mà vẫn dính merge conflict — soi lại thì thủ phạm là `index.ts`, nơi luồng nào cũng muốn thêm một dòng export. Thuốc: giao hẳn file đó cho một người, hoặc để lead tự merge nó cuối cùng.
+- **Bẫy contract drift.** Test của người này fail vì code của người kia — ai đó đổi signature mà không báo. Thuốc: contract muốn đổi phải qua lead, và phải báo mọi bên liên quan _trước_ khi sửa.
+
+> Nguyên tắc: ranh giới phải _tường minh_, đừng ngầm hiểu. Cả hai cái bẫy trên đều là một ranh giới ngầm bị bỏ sót.
+
+Đáng nói là cơ chế này **không có enforcement kỹ thuật** — không có cái khóa nào chặn implementer sửa file ngoài vùng. Nó là kỷ luật được viết vào prompt của từng role. Nghe mong manh, nhưng thực tế chạy ổn — vì task description của mỗi teammate chỉ nói về phần việc của nó, nên nó không có _lý do_ gì để đi sửa file người khác.
+
+---
+
+## 6. Vòng đời một feature — đi qua từng bước
+
+Đây là lệnh mình dùng nhiều nhất, và luôn kèm cờ `--plan-first`:
+
+```bash:team-feature.sh caption="Chạy một feature bằng team 3 implementer" showLineNumbers
+/team-feature "Add user authentication with OAuth2" --team-size 3 --plan-first
+
+# --plan-first: trình bày phương án chia luồng và CHỜ mình duyệt
+#               rồi mới spawn team — đừng bỏ cờ này.
+```
+
+<div style={{ textAlign: 'center' }}>
+  <img
+    id="figure-3"
+    src="/static/blog/claude-code-agent-teams/fig-3.png"
+    alt="Luồng /team-feature: Analysis → Decomposition → duyệt plan → Spawn team → 3 stream song song với dependency → Integration verify → Shutdown"
+    style={{ width: '100%', display: 'block', margin: '0 auto' }}
+  />
+  <p style={{ textAlign: 'center' }}>
+    Hình 3: Vòng đời một feature qua /team-feature — chốt chặn con người là bước duyệt
+    plan; sau đó các stream chạy song song theo hình kim cương: một nền móng chung,
+    nhiều nhánh, chụm lại lúc tích hợp.
+  </p>
+</div>
+
+1. **Analysis** — lead khảo sát codebase: file nào sẽ bị đụng, convention nào đang dùng, điểm tích hợp ở đâu.
+2. **Decomposition** — chia feature thành các **stream** với ownership độc quyền. Với ví dụ OAuth2 ở trên: Stream 1 _Login Flow_ (trang login + API + test của nó), Stream 2 _Registration Flow_ (tương tự cho đăng ký), Stream 3 _Shared Infrastructure_ (types, middleware, JWT utils).
+3. **Duyệt plan** — vì có `--plan-first`, toàn bộ phương án (stream nào, ai giữ file nào, phụ thuộc gì, contract ra sao) được trình ra và **chờ mình gật đầu**. Đây là chốt chặn con người quan trọng nhất của cả quy trình.
+4. **Spawn team** — tạo branch, dựng team, mỗi stream một implementer với prompt chứa sẵn danh sách file được giao và contract.
+5. **Chạy song song theo dependency** — Stream 1 và 2 đều `blockedBy` Stream 3: hạ tầng chung phải xong trước, hai luồng kia tự mở khóa và chạy song song ngay khi types + JWT sẵn sàng. Hình kim cương này (một nền móng, nhiều nhánh, chụm lại lúc tích hợp) là pattern phổ biến nhất trong thực tế.
+6. **Integration verification** — lead chạy build + test toàn cục; lỗi tích hợp thành task fix mới.
+7. **Shutdown** — tổng kết (file đã sửa, stream hoàn thành, test) rồi giải tán team.
+
+Để ý: con người xuất hiện đúng hai chỗ — duyệt plan ở bước 3, và review PR sau khi team giải tán ở bước 7. Ở giữa, team tự chạy. Với task được chia tốt, tổng thời gian chờ gần bằng thời gian của stream _dài nhất_, không phải _tổng_ các stream — đó chính là phần thưởng của song song hóa.
+
+---
+
+## 7. Hai pattern đáng tiền: review đa chiều và debug bằng giả thuyết cạnh tranh
+
+### 7.1. `/team-review` — nhiều lăng kính trên cùng một diff
+
+```bash:team-review.sh caption="Review một PR bằng 3 reviewer chuyên trách" showLineNumbers
+/team-review #123 --reviewers security,performance,architecture
+```
+
+Mỗi reviewer nhận cùng một diff nhưng **chỉ soi chiều của mình**. Xong việc, lead gộp kết quả: phát hiện trùng `file:line` được gộp lại, hai reviewer bất đồng về mức độ thì lấy mức **nặng hơn**, và phát hiện xuất hiện ở nhiều chiều được đánh dấu riêng — thường đó là chỗ đáng sợ nhất.
+
+Cái hay không phải là "ba con mắt thay vì một", mà là **mỗi con mắt được phép chuyên tâm**: reviewer security không bị phân tán bởi chuyện đặt tên biến, reviewer performance không sa đà vào chuyện bảo mật. Ba reviewer nghe có vẻ tốn gấp ba, nhưng cái tốn thật là sự **chồng lấn**, không phải số lượng: ba reviewer chuyên trách đốt token vào ba loại phát hiện khác nhau, còn một reviewer "soi mọi thứ" vừa loãng vừa dễ sót.
+
+### 7.2. `/team-debug` — tranh luận khoa học thay vì đoán mò
+
+```bash:team-debug.sh caption="Debug bằng 3 giả thuyết cạnh tranh" showLineNumbers
+/team-debug "API returns 500 on POST /users with valid payload" --hypotheses 3
+```
+
+Với bug khó, cách debug tệ nhất là bám chặt giả thuyết đầu tiên nghe có lý — thiên kiến neo (anchoring bias) kinh điển. `/team-debug` chống lại nó bằng cấu trúc: sinh N giả thuyết thuộc các nhóm nguyên nhân khác nhau (logic sai, dữ liệu bẩn, state hỏng, tích hợp gãy, tài nguyên cạn, môi trường lệch), rồi giao **mỗi giả thuyết cho một debugger riêng** — người này đi tìm bằng chứng xác nhận _hoặc bác bỏ_, và tuyệt đối không lấn sân giả thuyết của người khác.
+
+Cuối cùng lead làm trọng tài: giả thuyết nào được xác nhận với chuỗi nhân quả rõ ràng (kèm `file:line`), giả thuyết nào bị bác bỏ, giả thuyết nào chưa đủ dữ kiện. Còn một biến thể mạnh hơn nữa: cho các teammate **chủ động phản biện nhau** như một cuộc tranh luận khoa học. Nghe hơi kịch tính, nhưng với bug mà mình đã đoán sai hai lần liên tiếp, đây là cách thoát khỏi lối mòn nhanh nhất.
+
+---
+
+## 8. Vận hành hàng ngày: status, delegate, shutdown
+
+Ba lệnh còn lại là phần "quản lý nhân sự":
+
+- **`/team-status`** — bảng chấm công: ai đang làm task nào, ai rảnh, tiến độ bao nhiêu phần trăm. Mình chạy nó theo phản xạ như chạy `git status`.
+- **`/team-delegate --rebalance`** — nhìn workload cả team: ai 0 task (rảnh), ai 3+ task (quá tải), task nào đang bị chặn oan. Nó đề xuất phương án chuyển việc, mình duyệt rồi nó mới chuyển. Nguyên tắc đi kèm đáng nhớ: **teammate rảnh rỗi là công suất lãng phí** — giao thêm việc hoặc cho nghỉ hẳn.
+- **`/team-shutdown`** — giải tán có quy trình: teammate được yêu cầu kết thúc tử tế, ai đang dở việc có quyền từ chối và làm nốt. Đừng bao giờ tự kill bằng tay các phiên teammate — việc dở dang sẽ mất.
+
+Và một mẹo từ chính plugin: nếu giữa chừng phát hiện chia việc sai, **dừng ngay và chia lại** — chi phí bỏ đi phần code viết dở là chấp nhận được; tiếp tục với cách chia sai thì tệ hơn nhiều.
+
+---
+
+## 9. Đánh giá thẳng thắn
+
+Sau một thời gian dùng team cho việc thật, đây là sổ tay được/mất của mình.
+
+### Được gì
+
+- **Thời gian chờ co về luồng dài nhất.** Feature 3 luồng trước đây làm tuần tự cả buổi, giờ xong trong khoảng thời gian của luồng dài nhất — đúng như lời hứa ở mục 6.
+- **Chất lượng review tăng thật.** Không phải vì AI thông minh hơn, mà vì **mỗi reviewer được chuyên tâm một chiều**. Ba lăng kính hẹp bắt được thứ mà một lăng kính rộng bỏ sót.
+- **Debug thoát lối mòn.** Cấu trúc giả thuyết cạnh tranh ép quá trình debug đi theo bằng chứng thay vì theo cảm giác "chắc là do chỗ này".
+- **Ít va chạm hơn mình tưởng.** Kỷ luật one-owner-per-file + contract bất biến nghe lỏng lẻo mà chạy ổn.
+
+### Mất gì / phải đánh đổi
+
+- **Token đốt như đội tuyển ăn buffet.** Mỗi teammate là một phiên Claude đầy đủ với context riêng — tài liệu chính thức dẫn con số xấp xỉ **7×** so với phiên đơn (đo khi teammate chạy plan mode — chế độ lập kế hoạch trước khi sửa code), và chi phí tăng gần như tuyến tính theo số thành viên. Team 4 người cho một việc mà một người làm được là **lỗ nặng**.
+- **Teammate không biết gì về cuộc trò chuyện của bạn.** Nó load CLAUDE.md, MCP, skills — nhưng **không có lịch sử hội thoại của lead**. Teammate spawn ra mà ngồi im không nhặt task? Gần như chắc chắn do prompt giao việc thiếu ngữ cảnh. Mọi thứ nó cần phải nằm trong task description: mục tiêu, file được giao, yêu cầu, contract, tiêu chí hoàn thành.
+- **Những giới hạn experimental có thật.** Mỗi phiên chỉ một team; teammate không spawn được team con; `/resume` không khôi phục teammates dạng in-process (resume xong lead có thể nhắn tin cho những teammate... không còn tồn tại); thỉnh thoảng teammate quên đánh dấu task completed làm task sau bị chặn oan — phải nhắc hoặc tự sửa trạng thái.
+- **Điều phối là một nghề.** Chia việc kém thì team đông hơn chỉ tạo ra hỗn loạn đắt tiền hơn. Tài liệu chính thức có một câu mình rất thích: _"ba teammate tập trung thường thắng năm teammate dàn trải"_.
+
+### Khi nào KHÔNG dùng team
+
+Quan trọng ngang việc biết dùng: **việc tuần tự** (bước sau cần kết quả bước trước) — team không giúp gì; **việc đụng cùng một file** — chia kiểu gì cũng giẫm chân; **việc nhỏ** — một phiên đơn hoặc subagent là đủ, đừng dựng cả team để sửa một cái nút. Team chỉ đáng tiền khi việc _thật sự chia được_ và _đủ lớn_.
+
+---
+
+## 10. Áp dụng cho dự án của bạn — checklist
+
+Thứ tự mình khuyên, từ rẻ đến đắt:
+
+- [ ] **Bật cờ** `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1` trong `settings.json`, chọn `teammateMode` (dùng thử `tmux` nếu bạn sống trong terminal).
+- [ ] **Cài plugin agent-teams** từ marketplace `claude-code-workflows` để có sẵn role + lệnh `/team-*`.
+- [ ] **Bắt đầu bằng `/team-review`** trên một PR có sẵn — đây là cách nếm thử ít rủi ro nhất: không ai sửa code của bạn, chỉ có thêm ba cặp mắt.
+- [ ] **Thử `/team-debug`** với một bug bạn đã đoán sai ít nhất một lần.
+- [ ] **Rồi mới đến `/team-feature`** — và luôn luôn `--plan-first`. Duyệt kỹ phương án chia luồng: ranh giới file rõ chưa, contract chốt chưa, dependency có thành chuỗi dọc không (chuỗi càng dọc, song song càng ảo).
+- [ ] **Giữ team nhỏ.** Plugin khuyên 2–4, tài liệu chính thức gợi ý bắt đầu 3–5 — kinh nghiệm của mình là bắt đầu ở cận dưới: cần thêm góc nhìn khi review thì thêm một reviewer chuyên trách một chiều mới, đừng vội tăng số implementer.
+- [ ] **Theo dõi bằng `/team-status`**, cân bằng bằng `/team-delegate --rebalance`, giải tán bằng `/team-shutdown` — đừng kill thủ công.
+
+---
+
+## 11. Kết
+
+Bài trước mình kết bằng ý: vai trò của bạn dịch chuyển từ "người gõ code" sang "người dựng hệ thống và giữ phán đoán". Agent Teams đẩy sự dịch chuyển đó thêm một nấc: từ quản lý **một** AI sang quản lý **một team** AI — và đột nhiên những kỹ năng rất con người của một tech lead (chia việc sao cho không giẫm chân, chốt interface trước khi code, review theo chiều, không để ai ngồi không) trở thành kỹ năng dùng AI.
+
+Công thức mình rút ra:
+
+> **Subagent cấp _cánh tay_. Agent Teams cấp _đồng đội_. File ownership cấp _trật tự_. Contract cấp _hòa bình_. Plan-first cấp _phanh_. Còn bạn — team lead của team lead — giữ _phán đoán_.**
+
+Một con AI giỏi giúp bạn code nhanh hơn. Một team AI được điều phối tốt thay đổi cả cách bạn nghĩ về "một người làm được gì trong một buổi chiều". Nhưng nhớ cho kỹ: team càng đông, kỷ luật càng phải chặt — điều đó đúng với người, và hóa ra cũng đúng y nguyên với AI.
+
+> [!NOTE]
+> Ba sơ đồ trong bài được vẽ bằng MCP **Excalidraw** và xuất ảnh bằng **Excalidraw export MCP**. File nguồn `.excalidraw` nằm cạnh ảnh trong `public/static/blog/claude-code-agent-teams/`, có thể mở lại để chỉnh.
