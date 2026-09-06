@@ -12,45 +12,51 @@ interface Props {
 
 // ─── Skills data ──────────────────────────────────────────────────
 const skills = {
+  Languages: ['Swift', 'Objective-C', 'Dart'],
   'iOS & Apple': [
-    'Swift',
-    'Objective-C',
     'SwiftUI',
     'UIKit',
-    'HealthKit',
-    'Vision',
-    'WKWebView',
-    'Swift Macros',
     'Swift Concurrency',
+    'Swift Macros',
+    'HealthKit',
+    'watchOS',
+    'WKWebView',
+    'Instruments',
   ],
-  Architecture: ['TCA', 'MVVM', 'MVVM-C', 'Clean Architecture', 'BLoC'],
-  'Cross-Platform': ['Flutter', 'Dart', 'Android SDK', 'Jetpack'],
-  'Networking & Auth': [
-    'RESTful API',
-    'WebSocket',
+  Architecture: ['TCA', 'MVVM', 'MVVM-C', 'Clean Architecture', 'OOP & SOLID'],
+  'Cross-Platform': ['Flutter', 'BLoC', 'Platform Channels', 'Dio'],
+  Android: ['Kotlin', 'Java', 'Jetpack Compose'],
+  'Networking & Storage': [
     'URLSession',
-    'Firebase',
+    'RESTful API',
+    'Codable',
+    'WebSocket',
+    'Socket.IO',
+    'Core Data',
+    'SwiftData',
+    'Realm',
+    'Keychain',
+  ],
+  'Security & Messaging': [
     'Face ID/Touch ID',
     'AES-256',
     'JWT',
+    'APNs',
+    'Firebase Cloud Messaging',
+    'UserNotifications',
   ],
-  'CI/CD & Tooling': [
+  Testing: ['XCTest', 'XCUITest'],
+  'CI/CD & DevOps': [
     'Fastlane',
-    'GitLab CI/CD',
+    'GitLab CI',
     'GitHub Actions',
-    'App Store Connect',
     'TestFlight',
-    'XCTest',
-  ],
-  'DevOps & Backend': [
+    'App Store Connect',
     'Docker',
-    'Kubernetes',
-    'Spring Boot',
-    'Kafka',
-    'PostgreSQL',
-    'MongoDB',
-    'Redis',
+    'Kubernetes (Helm)',
   ],
+  'AI Engineering': ['Claude Code', 'MCP', 'OpenAI Codex', 'Gemini CLI'],
+  Backend: ['Spring Boot', 'Kafka', 'PostgreSQL', 'MongoDB', 'Redis'],
 }
 
 // ─── Badge component ───────────────────────────────────────────────
@@ -146,10 +152,21 @@ export default function AuthorLayout({ children, content }: Props) {
                           </p>
                         </div>
                       </div>
-                      <span className="shrink-0 text-sm text-gray-400">Aug 2022 – Jan 2026</span>
+                      <span className="shrink-0 text-sm text-gray-400">Aug 2022 – Present</span>
                     </div>
                     {/* Sub-projects */}
                     <ul className="mt-3 space-y-3 border-l-2 border-gray-100 pl-4 dark:border-gray-800">
+                      <li>
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <h4 className="font-medium text-gray-800 dark:text-gray-200">wellgo</h4>
+                            <p className="text-xs text-gray-400">
+                              Corporate Health &amp; Wellness Platform, Japan — Flutter, EN/JA
+                            </p>
+                          </div>
+                          <span className="shrink-0 text-xs text-gray-400">May 2026 – Present</span>
+                        </div>
+                      </li>
                       <li>
                         <div className="flex items-start justify-between">
                           <div>
@@ -157,11 +174,11 @@ export default function AuthorLayout({ children, content }: Props) {
                               DMS Viettel
                             </h4>
                             <p className="text-xs text-gray-400">
-                              Enterprise Distribution Management — Inventory, Orders & Logistics
+                              Enterprise Distribution Management — Inventory, Orders &amp; Logistics
                             </p>
                           </div>
                           <span className="shrink-0 text-xs text-gray-400">
-                            Sep 2025 – Jan 2026
+                            Sep 2024 – Apr 2026
                           </span>
                         </div>
                       </li>
@@ -170,11 +187,11 @@ export default function AuthorLayout({ children, content }: Props) {
                           <div>
                             <h4 className="font-medium text-gray-800 dark:text-gray-200">JRA</h4>
                             <p className="text-xs text-gray-400">
-                              Real-time Horse Racing & Betting — 1M+ Active Users
+                              Real-time Horse Racing &amp; Betting — 1M+ Active Users
                             </p>
                           </div>
                           <span className="shrink-0 text-xs text-gray-400">
-                            Aug 2024 – Aug 2025
+                            Aug 2023 – Aug 2024
                           </span>
                         </div>
                       </li>
@@ -182,14 +199,14 @@ export default function AuthorLayout({ children, content }: Props) {
                         <div className="flex items-start justify-between">
                           <div>
                             <h4 className="font-medium text-gray-800 dark:text-gray-200">
-                              Dacadoo
+                              dacadoo
                             </h4>
                             <p className="text-xs text-gray-400">
                               Multi-tenant Digital Health Platform — 10+ Countries
                             </p>
                           </div>
                           <span className="shrink-0 text-xs text-gray-400">
-                            Jan 2023 – Jul 2024
+                            Jan 2023 – Jul 2023
                           </span>
                         </div>
                       </li>

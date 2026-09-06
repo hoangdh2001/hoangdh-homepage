@@ -3,7 +3,7 @@ const siteMetadata = {
   title: '@hoangdh2001',
   author: 'Do Huy Hoang',
   headerTitle: '@hoangdh2001',
-  description: 'iOS Engineer | Swift · SwiftUI · Flutter',
+  description: 'Mobile Engineer | iOS (Swift) · SwiftUI · Flutter',
   openToWork: true,
   language: 'en-us',
   theme: 'dark',
