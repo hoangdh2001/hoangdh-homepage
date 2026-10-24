@@ -11,7 +11,6 @@ const projectsData: Project[] = [
     description:
       'Independent full-stack project built with NestJS, Next.js, TypeScript and PostgreSQL. Customer storefront and admin application for products, orders, inventory and customer management. Includes Prisma migrations, SQL search, Google sign-in, Pancake / Meta Ads data synchronization, and Docker deployment through Coolify.',
     imgSrc: '',
-    href: 'https://tiemhoamotdoathangba.com',
   },
   {
     title: 'Apple app automation test - Claude Plugin',
