@@ -23,12 +23,7 @@ const skills = {
     'MongoDB',
     'Redis',
   ],
-  'API & Integration': [
-    'RESTful APIs',
-    'WebSocket',
-    'Socket.IO',
-    'Pancake / Meta Ads Data Synchronization',
-  ],
+  'API & Integration': ['RESTful APIs', 'WebSocket', 'Socket.IO', 'Data Synchronization'],
   'Auth & Security': ['Google Sign-in', 'JWT', 'RBAC', 'Keychain', 'Face ID / Touch ID', 'AES-256'],
   Testing: ['Jest', 'Vitest', 'XCTest', 'XCUITest'],
   'CI/CD & DevOps': [

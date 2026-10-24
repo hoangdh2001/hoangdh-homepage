@@ -29,7 +29,7 @@ const projectsData: Project[] = [
   {
     title: 'Octopus — Real-time Team Collaboration Backend',
     description:
-      'Backend services developed with NestJS and Spring Boot, including JWT authentication, RBAC and Kafka integration. Deployed to Kubernetes via Helm and GitLab CI/CD.',
+      'Backend services developed with NestJS and Spring Boot, using Kafka messaging, JWT authentication and RBAC. Deployed to Kubernetes via Helm and GitLab CI/CD.',
     imgSrc: '',
     href: 'https://gitlab.com/nhom-40-khoa-luan-tot-nghiep/octopus-be',
   },
