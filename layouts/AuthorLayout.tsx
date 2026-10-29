@@ -12,33 +12,51 @@ interface Props {
 
 // ─── Skills data ──────────────────────────────────────────────────
 const skills = {
-  Languages: ['TypeScript', 'JavaScript', 'Java', 'Kotlin', 'Swift', 'Objective-C', 'Dart'],
-  Backend: ['NestJS', 'Node.js', 'Spring Boot', 'Kafka'],
-  Frontend: ['Next.js', 'React', 'TypeScript'],
-  'Database & ORM': [
-    'PostgreSQL',
-    'Prisma',
-    'SQL',
-    'Schema Design & Migrations',
-    'MongoDB',
-    'Redis',
+  Languages: ['Swift', 'Objective-C', 'Dart'],
+  'iOS & Apple': [
+    'SwiftUI',
+    'UIKit',
+    'Swift Concurrency',
+    'Swift Macros',
+    'HealthKit',
+    'watchOS',
+    'WKWebView',
+    'Instruments',
   ],
-  'API & Integration': ['RESTful APIs', 'WebSocket', 'Socket.IO', 'Data Synchronization'],
-  'Auth & Security': ['Google Sign-in', 'JWT', 'RBAC', 'Keychain', 'Face ID / Touch ID', 'AES-256'],
-  Testing: ['Jest', 'Vitest', 'XCTest', 'XCUITest'],
+  Architecture: ['TCA', 'MVVM', 'MVVM-C', 'Clean Architecture', 'OOP & SOLID'],
+  'Cross-Platform': ['Flutter', 'BLoC', 'Platform Channels', 'Dio'],
+  Android: ['Kotlin', 'Java', 'Jetpack Compose'],
+  'Networking & Storage': [
+    'URLSession',
+    'RESTful API',
+    'Codable',
+    'WebSocket',
+    'Socket.IO',
+    'Core Data',
+    'SwiftData',
+    'Realm',
+    'Keychain',
+  ],
+  'Security & Messaging': [
+    'Face ID/Touch ID',
+    'AES-256',
+    'JWT',
+    'APNs',
+    'Firebase Cloud Messaging',
+    'UserNotifications',
+  ],
+  Testing: ['XCTest', 'XCUITest'],
   'CI/CD & DevOps': [
-    'Docker',
-    'Coolify',
-    'GitHub Actions',
-    'GitLab CI',
-    'Kubernetes (Helm)',
     'Fastlane',
+    'GitLab CI',
+    'GitHub Actions',
+    'TestFlight',
+    'App Store Connect',
+    'Docker',
+    'Kubernetes (Helm)',
   ],
-  'iOS & Apple': ['SwiftUI', 'UIKit', 'Swift Concurrency', 'HealthKit', 'watchOS'],
-  Flutter: ['Flutter', 'BLoC', 'Platform Channels'],
-  'Android (Working Knowledge)': ['Kotlin', 'Jetpack Compose'],
-  Architecture: ['Clean Architecture', 'MVVM', 'MVVM-C', 'TCA', 'OOP & SOLID', 'Design Patterns'],
-  'AI Engineering': ['Claude Code', 'Skills', 'Subagents', 'MCP', 'OpenAI Codex', 'Gemini CLI'],
+  'AI Engineering': ['Claude Code', 'MCP', 'OpenAI Codex', 'Gemini CLI'],
+  Backend: ['Spring Boot', 'Kafka', 'PostgreSQL', 'MongoDB', 'Redis'],
 }
 
 // ─── Badge component ───────────────────────────────────────────────
@@ -134,7 +152,7 @@ export default function AuthorLayout({ children, content }: Props) {
                           </p>
                         </div>
                       </div>
-                      <span className="shrink-0 text-sm text-gray-400">Aug 2022 – Sep 2026</span>
+                      <span className="shrink-0 text-sm text-gray-400">Aug 2022 – Present</span>
                     </div>
                     {/* Sub-projects */}
                     <ul className="mt-3 space-y-3 border-l-2 border-gray-100 pl-4 dark:border-gray-800">
@@ -146,9 +164,7 @@ export default function AuthorLayout({ children, content }: Props) {
                               Corporate Health &amp; Wellness Platform, Japan — Flutter, EN/JA
                             </p>
                           </div>
-                          <span className="shrink-0 text-xs text-gray-400">
-                            May 2026 – Sep 2026
-                          </span>
+                          <span className="shrink-0 text-xs text-gray-400">May 2026 – Present</span>
                         </div>
                       </li>
                       <li>

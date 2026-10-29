@@ -7,12 +7,6 @@ interface Project {
 
 const projectsData: Project[] = [
   {
-    title: 'Một Đóa Tháng Ba — Commerce & Operations Platform',
-    description:
-      'Independent full-stack project built with NestJS, Next.js, TypeScript and PostgreSQL. Customer storefront and admin application for products, orders, inventory and customer management. Includes Prisma migrations, SQL search, Google sign-in, Pancake / Meta Ads data synchronization, and Docker deployment through Coolify.',
-    imgSrc: '',
-  },
-  {
     title: 'Apple app automation test - Claude Plugin',
     description:
       'AI-driven UI test automation for iOS, iPadOS, and macOS apps — powered by Claude Code, xcodebuildmcp, and AXe CLI.',
@@ -29,14 +23,14 @@ const projectsData: Project[] = [
   {
     title: 'Octopus — Real-time Team Collaboration Backend',
     description:
-      'Backend services developed with NestJS and Spring Boot, using Kafka messaging, JWT authentication and RBAC. Deployed to Kubernetes via Helm and GitLab CI/CD.',
+      '7-service Spring Boot and NestJs microservices backend with Kafka async event streaming. Deployed to Kubernetes via Helm + GitLab CI/CD pipelines.',
     imgSrc: '',
     href: 'https://gitlab.com/nhom-40-khoa-luan-tot-nghiep/octopus-be',
   },
   {
     title: 'Octopus — Real-time Team Collaboration Mobile Client',
     description:
-      'Full-stack real-time collaboration platform. Flutter mobile client with Clean Architecture (Data/Domain/Presentation), real-time messaging via Socket.IO, push notifications and file sharing.',
+      'Full-stack real-time collaboration platform. Flutter mobile client with Clean Architecture (Data/Domain/Presentation), real-time messaging via Socket.io, push notifications and file sharing.',
     imgSrc: '',
     href: 'https://gitlab.com/nhom-40-khoa-luan-tot-nghiep/octopus-mobile',
   },
